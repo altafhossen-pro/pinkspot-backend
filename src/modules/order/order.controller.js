@@ -621,8 +621,10 @@ exports.createOrder = async (req, res) => {
           _id: order._id,
           orderId: order.orderId,
           total: order.total,
+          shippingCost: order.shippingCost || 0,
           itemsCount: order.items.length,
           customerName: order.user ? (order.user.name || 'User') : (order.guestInfo?.name || 'Guest'),
+          phone: order.user ? order.user.phone : (order.shippingAddress?.phone || order.guestInfo?.phone || ''),
           status: order.status,
           createdAt: order.createdAt
         });
@@ -2584,8 +2586,10 @@ exports.createGuestOrder = async (req, res) => {
           _id: order._id,
           orderId: order.orderId,
           total: order.total,
+          shippingCost: order.shippingCost || 0,
           itemsCount: order.items.length,
           customerName: order.guestInfo?.name || 'Guest',
+          phone: order.guestInfo?.phone || order.shippingAddress?.phone || '',
           status: order.status,
           createdAt: order.createdAt
         });
@@ -2830,8 +2834,10 @@ exports.createManualOrder = async (req, res) => {
           _id: order._id,
           orderId: order.orderId,
           total: order.total,
+          shippingCost: order.shippingCost || 0,
           itemsCount: order.items.length,
           customerName: orderType === 'guest' ? (guestInfo?.name || 'Guest') : (populatedOrder.user?.name || 'User'),
+          phone: orderType === 'guest' ? (guestInfo?.phone || '') : (populatedOrder.user?.phone || populatedOrder.shippingAddress?.phone || ''),
           status: order.status,
           createdAt: order.createdAt
         });
@@ -3402,19 +3408,36 @@ exports.addOrderToSteadfast = async (req, res) => {
   }
 };
 
-exports.getUnreadOrders = async (req, res) => {
+exports.getNotifications = async (req, res) => {
   try {
-    const unreadOrders = await Order.find({ isReadByAdmin: false, isDeleted: false })
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    const query = { isDeleted: false };
+
+    // Get paginated notifications
+    const notifications = await Order.find(query)
       .sort({ createdAt: -1 })
-      .select('orderId total items status createdAt user guestInfo')
-      .populate('user', 'name');
+      .skip(skip)
+      .limit(limit)
+      .select('orderId total shippingCost items status createdAt user guestInfo isReadByAdmin')
+      .populate('user', 'name phone');
+
+    // Get total unread count
+    const unreadCount = await Order.countDocuments({ ...query, isReadByAdmin: false });
+    const totalCount = await Order.countDocuments(query);
 
     return sendResponse({
       res,
       statusCode: 200,
       success: true,
-      message: 'Unread orders fetched successfully',
-      data: unreadOrders
+      message: 'Notifications fetched successfully',
+      data: {
+        notifications,
+        unreadCount,
+        hasMore: totalCount > skip + notifications.length
+      }
     });
   } catch (error) {
     return sendResponse({
