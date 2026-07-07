@@ -12,6 +12,9 @@ router.get('/', verifyToken, orderController.getOrders);
 router.get('/user', verifyToken, orderController.getUserOrders);
 
 // Admin routes (should come before dynamic routes like /:id)
+router.get('/admin/unread', verifyToken, verifyTokenAdmin, orderController.getUnreadOrders);
+router.patch('/admin/:id/mark-read', verifyToken, verifyTokenAdmin, orderController.markOrderAsRead);
+
 router.get('/admin/list', verifyToken, verifyTokenAdmin, checkPermission('order', 'read'), orderController.getAdminOrders);
 router.get('/user/:orderId', verifyToken, orderController.getUserOrderById);
 router.get('/track/:orderId', orderController.trackOrder);

@@ -15,6 +15,7 @@ const { Affiliate } = require('../affiliate/affiliate.model');
 const { AffiliateTracking } = require('../affiliate/affiliateTracking.model');
 const steadfastService = require('../steadfast/steadfast.service');
 const mongoose = require('mongoose');
+const socketConfig = require('../../socket');
 
 exports.createOrder = async (req, res) => {
   try {
@@ -609,6 +610,25 @@ exports.createOrder = async (req, res) => {
         console.error('Error preparing order confirmation email:', emailError);
         // Don't fail the order creation if email fails
       }
+    }
+
+    // Emit real-time notification to admin panel
+    try {
+      const io = socketConfig.getIo();
+      if (io) {
+        // Send a minimal order representation to save bandwidth
+        io.emit('new-order', {
+          _id: order._id,
+          orderId: order.orderId,
+          total: order.total,
+          itemsCount: order.items.length,
+          customerName: order.user ? (order.user.name || 'User') : (order.guestInfo?.name || 'Guest'),
+          status: order.status,
+          createdAt: order.createdAt
+        });
+      }
+    } catch (socketErr) {
+      console.error('Socket notification error:', socketErr);
     }
 
     return sendResponse({
@@ -2556,6 +2576,24 @@ exports.createGuestOrder = async (req, res) => {
       }
     }
 
+    // Emit real-time notification to admin panel
+    try {
+      const io = socketConfig.getIo();
+      if (io) {
+        io.emit('new-order', {
+          _id: order._id,
+          orderId: order.orderId,
+          total: order.total,
+          itemsCount: order.items.length,
+          customerName: order.guestInfo?.name || 'Guest',
+          status: order.status,
+          createdAt: order.createdAt
+        });
+      }
+    } catch (socketErr) {
+      console.error('Socket notification error:', socketErr);
+    }
+
     return sendResponse({
       res,
       statusCode: 201,
@@ -2782,6 +2820,24 @@ exports.createManualOrder = async (req, res) => {
         console.error('Error preparing order confirmation SMS:', smsError);
         // Don't fail the order creation if SMS fails
       }
+    }
+
+    // Emit real-time notification to admin panel
+    try {
+      const io = socketConfig.getIo();
+      if (io) {
+        io.emit('new-order', {
+          _id: order._id,
+          orderId: order.orderId,
+          total: order.total,
+          itemsCount: order.items.length,
+          customerName: orderType === 'guest' ? (guestInfo?.name || 'Guest') : (populatedOrder.user?.name || 'User'),
+          status: order.status,
+          createdAt: order.createdAt
+        });
+      }
+    } catch (socketErr) {
+      console.error('Socket notification error:', socketErr);
     }
 
     return sendResponse({
@@ -3342,6 +3398,65 @@ exports.addOrderToSteadfast = async (req, res) => {
       statusCode: 500,
       success: false,
       message: error.message || 'Server error',
+    });
+  }
+};
+
+exports.getUnreadOrders = async (req, res) => {
+  try {
+    const unreadOrders = await Order.find({ isReadByAdmin: false, isDeleted: false })
+      .sort({ createdAt: -1 })
+      .select('orderId total items status createdAt user guestInfo')
+      .populate('user', 'name');
+
+    return sendResponse({
+      res,
+      statusCode: 200,
+      success: true,
+      message: 'Unread orders fetched successfully',
+      data: unreadOrders
+    });
+  } catch (error) {
+    return sendResponse({
+      res,
+      statusCode: 500,
+      success: false,
+      message: error.message || 'Server error'
+    });
+  }
+};
+
+exports.markOrderAsRead = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const order = await Order.findByIdAndUpdate(
+      id,
+      { isReadByAdmin: true },
+      { new: true }
+    );
+
+    if (!order) {
+      return sendResponse({
+        res,
+        statusCode: 404,
+        success: false,
+        message: 'Order not found'
+      });
+    }
+
+    return sendResponse({
+      res,
+      statusCode: 200,
+      success: true,
+      message: 'Order marked as read',
+      data: order
+    });
+  } catch (error) {
+    return sendResponse({
+      res,
+      statusCode: 500,
+      success: false,
+      message: error.message || 'Server error'
     });
   }
 };

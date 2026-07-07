@@ -48,7 +48,7 @@ const trackingSchema = new mongoose.Schema({
 const orderUpdateHistorySchema = new mongoose.Schema({
     updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     updateType: { type: String, required: true }, // 'status_change', 'item_update', 'address_change', 'price_change', etc.
-    
+
     // All changes stored in this array (single or multiple)
     changes: [{
         field: { type: String, required: true },
@@ -56,14 +56,14 @@ const orderUpdateHistorySchema = new mongoose.Schema({
         newValue: { type: mongoose.Schema.Types.Mixed },
         updateType: { type: String }
     }],
-    
+
     reason: { type: String }, // Reason for update
     timestamp: { type: Date, default: Date.now },
     notes: { type: String } // Additional notes about the update
 }, { _id: true });
 
 const orderSchema = new mongoose.Schema({
-    orderId: { type: String, unique: true, index: true }, 
+    orderId: { type: String, unique: true, index: true },
     user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, // Made optional for guest orders
     items: [orderItemSchema],
     shippingAddress: addressSchema,
@@ -152,7 +152,9 @@ const orderSchema = new mongoose.Schema({
     // Steadfast Courier Integration
     isAddedIntoSteadfast: { type: Boolean, default: false },
     steadfastConsignmentId: { type: String },
-    steadfastTrackingCode: { type: String }
+    steadfastTrackingCode: { type: String },
+    steadfastCollectedAmount: { type: Number, default: 0 },
+    isReadByAdmin: { type: Boolean, default: false }
 }, {
     timestamps: true,
 });
@@ -167,23 +169,23 @@ orderSchema.index({ isDeleted: 1 });
 const generateOrderId = async () => {
     let orderId;
     let isUnique = false;
-    
+
     while (!isUnique) {
         // Generate 6-digit number
         orderId = Math.floor(100000 + Math.random() * 900000).toString();
-        
+
         // Check if it already exists
         const existingOrder = await mongoose.model('Order').findOne({ orderId });
         if (!existingOrder) {
             isUnique = true;
         }
     }
-    
+
     return orderId;
 };
 
 // Pre-save middleware to generate orderId
-orderSchema.pre('save', async function(next) {
+orderSchema.pre('save', async function (next) {
     // Always generate orderId if it doesn't exist
     if (!this.orderId) {
         this.orderId = await generateOrderId();

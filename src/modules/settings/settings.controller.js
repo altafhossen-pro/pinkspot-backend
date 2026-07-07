@@ -366,6 +366,17 @@ exports.getSteadfastSettings = async (req, res) => {
     // If no settings exist, create default settings
     if (!settings) {
       settings = new Settings();
+    }
+    
+    // Generate webhookToken if it doesn't exist
+    if (!settings.steadfastSettings || !settings.steadfastSettings.webhookToken) {
+      const crypto = require('crypto');
+      if (!settings.steadfastSettings) {
+        settings.steadfastSettings = {};
+      }
+      settings.steadfastSettings.webhookToken = crypto.randomBytes(32).toString('hex');
+      await settings.save();
+    } else if (settings.isModified()) {
       await settings.save();
     }
 

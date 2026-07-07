@@ -130,6 +130,10 @@ const settingsSchema = new mongoose.Schema({
     apiSecret: {
       type: String,
       default: ''
+    },
+    webhookToken: {
+      type: String,
+      default: ''
     }
   },
 

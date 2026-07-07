@@ -108,55 +108,7 @@ exports.getDashboardStats = async (req, res) => {
           isDeleted: false
         } 
       },
-      {
-        $project: {
-          items: 1,
-          returnQuantities: 1,
-          subtotal: {
-            $let: {
-              vars: {
-                // Calculate total items value
-                totalValue: {
-                  $reduce: {
-                    input: "$items",
-                    initialValue: 0,
-                    in: { $add: ["$$value", { $multiply: ["$$this.price", "$$this.quantity"] }] }
-                  }
-                },
-                // Calculate returned items value (if partial return exists)
-                returnedValue: {
-                  $cond: {
-                    if: { $and: [{ $ne: ["$returnQuantities", null] }, { $gt: [{ $size: { $ifNull: ["$returnQuantities", []] } }, 0] }] },
-                    then: {
-                      $reduce: {
-                        input: "$returnQuantities",
-                        initialValue: 0,
-                        in: {
-                          $add: [
-                            "$$value",
-                            {
-                              $multiply: [
-                                { $arrayElemAt: ["$items.price", "$$this.itemIndex"] },
-                                "$$this.quantity"
-                              ]
-                            }
-                          ]
-                        }
-                      }
-                    },
-                    else: 0
-                  }
-                }
-              },
-              in: {
-                // Subtract returned value from total value
-                $subtract: ["$$totalValue", "$$returnedValue"]
-              }
-            }
-          }
-        }
-      },
-      { $group: { _id: null, total: { $sum: '$subtotal' } } }
+      { $group: { _id: null, total: { $sum: '$steadfastCollectedAmount' } } }
     ]);
     const totalSales = totalSalesAgg[0]?.total || 0;
 
@@ -216,55 +168,7 @@ exports.getDashboardStats = async (req, res) => {
               }
             }
       },
-      {
-        $project: {
-          items: 1,
-          returnQuantities: 1,
-          subtotal: {
-            $let: {
-              vars: {
-                // Calculate total items value
-                totalValue: {
-                  $reduce: {
-                    input: "$items",
-                    initialValue: 0,
-                    in: { $add: ["$$value", { $multiply: ["$$this.price", "$$this.quantity"] }] }
-                  }
-                },
-                // Calculate returned items value (if partial return exists)
-                returnedValue: {
-                  $cond: {
-                    if: { $and: [{ $ne: ["$returnQuantities", null] }, { $gt: [{ $size: { $ifNull: ["$returnQuantities", []] } }, 0] }] },
-                    then: {
-                      $reduce: {
-                        input: "$returnQuantities",
-                        initialValue: 0,
-                        in: {
-                          $add: [
-                            "$$value",
-                            {
-                              $multiply: [
-                                { $arrayElemAt: ["$items.price", "$$this.itemIndex"] },
-                                "$$this.quantity"
-                              ]
-                            }
-                          ]
-                        }
-                      }
-                    },
-                    else: 0
-                  }
-                }
-              },
-              in: {
-                // Subtract returned value from total value
-                $subtract: ["$$totalValue", "$$returnedValue"]
-              }
-            }
-          }
-        }
-      },
-      { $group: { _id: null, total: { $sum: '$subtotal' } } }
+      { $group: { _id: null, total: { $sum: '$steadfastCollectedAmount' } } }
     ]);
     const periodSales = periodSalesAgg[0]?.total || 0;
 
@@ -319,55 +223,7 @@ exports.getDashboardStats = async (req, res) => {
           }
         }
       },
-      {
-        $project: {
-          items: 1,
-          returnQuantities: 1,
-          subtotal: {
-            $let: {
-              vars: {
-                // Calculate total items value
-                totalValue: {
-                  $reduce: {
-                    input: "$items",
-                    initialValue: 0,
-                    in: { $add: ["$$value", { $multiply: ["$$this.price", "$$this.quantity"] }] }
-                  }
-                },
-                // Calculate returned items value (if partial return exists)
-                returnedValue: {
-                  $cond: {
-                    if: { $and: [{ $ne: ["$returnQuantities", null] }, { $gt: [{ $size: { $ifNull: ["$returnQuantities", []] } }, 0] }] },
-                    then: {
-                      $reduce: {
-                        input: "$returnQuantities",
-                        initialValue: 0,
-                        in: {
-                          $add: [
-                            "$$value",
-                            {
-                              $multiply: [
-                                { $arrayElemAt: ["$items.price", "$$this.itemIndex"] },
-                                "$$this.quantity"
-                              ]
-                            }
-                          ]
-                        }
-                      }
-                    },
-                    else: 0
-                  }
-                }
-              },
-              in: {
-                // Subtract returned value from total value
-                $subtract: ["$$totalValue", "$$returnedValue"]
-              }
-            }
-          }
-        }
-      },
-      { $group: { _id: null, total: { $sum: '$subtotal' } } }
+      { $group: { _id: null, total: { $sum: '$steadfastCollectedAmount' } } }
     ]);
     const previousSales = previousSalesAgg[0]?.total || 0;
 
@@ -485,50 +341,7 @@ exports.getDashboardStats = async (req, res) => {
         $project: {
           year: { $year: "$relevantDate" },
           month: { $month: "$relevantDate" },
-          items: 1,
-          returnQuantities: 1,
-          subtotal: {
-            $let: {
-              vars: {
-                // Calculate total items value
-                totalValue: {
-                  $reduce: {
-                    input: "$items",
-                    initialValue: 0,
-                    in: { $add: ["$$value", { $multiply: ["$$this.price", "$$this.quantity"] }] }
-                  }
-                },
-                // Calculate returned items value (if partial return exists)
-                returnedValue: {
-                  $cond: {
-                    if: { $and: [{ $ne: ["$returnQuantities", null] }, { $gt: [{ $size: { $ifNull: ["$returnQuantities", []] } }, 0] }] },
-                    then: {
-                      $reduce: {
-                        input: "$returnQuantities",
-                        initialValue: 0,
-                        in: {
-                          $add: [
-                            "$$value",
-                            {
-                              $multiply: [
-                                { $arrayElemAt: ["$items.price", "$$this.itemIndex"] },
-                                "$$this.quantity"
-                              ]
-                            }
-                          ]
-                        }
-                      }
-                    },
-                    else: 0
-                  }
-                }
-              },
-              in: {
-                // Subtract returned value from total value
-                $subtract: ["$$totalValue", "$$returnedValue"]
-              }
-            }
-          }
+          steadfastCollectedAmount: 1
         }
       },
       {
@@ -537,7 +350,7 @@ exports.getDashboardStats = async (req, res) => {
             year: "$year",
             month: "$month"
           },
-          total: { $sum: '$subtotal' },
+          total: { $sum: '$steadfastCollectedAmount' },
           count: { $sum: 1 }
         }
       },
@@ -685,9 +498,9 @@ exports.getSalesAnalytics = async (req, res) => {
       {
         $group: {
           _id: groupFormat,
-          totalSales: { $sum: '$total' },
+          totalSales: { $sum: '$steadfastCollectedAmount' },
           totalOrders: { $sum: 1 },
-          avgOrderValue: { $avg: '$total' }
+          avgOrderValue: { $avg: '$steadfastCollectedAmount' }
         }
       },
       { $sort: { '_id.year': 1, '_id.month': 1, '_id.day': 1, '_id.hour': 1 } }
@@ -807,8 +620,8 @@ exports.getCustomerAnalytics = async (req, res) => {
         $group: {
           _id: '$user',
           totalOrders: { $sum: 1 },
-          totalSpent: { $sum: '$total' },
-          avgOrderValue: { $avg: '$total' }
+          totalSpent: { $sum: '$steadfastCollectedAmount' },
+          avgOrderValue: { $avg: '$steadfastCollectedAmount' }
         }
       },
       {
@@ -837,7 +650,7 @@ exports.getCustomerAnalytics = async (req, res) => {
           isDeleted: false
         } 
       },
-      { $group: { _id: null, total: { $sum: '$total' } } }
+      { $group: { _id: null, total: { $sum: '$steadfastCollectedAmount' } } }
     ]);
     const avgCustomerValue = totalCustomers > 0 ? 
       (totalRevenue[0]?.total || 0) / totalCustomers : 0;

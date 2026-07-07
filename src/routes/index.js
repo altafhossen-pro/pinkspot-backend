@@ -30,6 +30,7 @@ const contactRoutes = require('../modules/contact/contact.route');
 const notificationRoutes = require('../modules/notification/notification.route');
 
 const androidBannerRoutes = require('../modules/androidBanner/androidBanner.route');
+const steadfastRoutes = require('../modules/steadfast/steadfast.route');
 
 router.use('/user', userRoutes);
 router.use('/otp', otpRoutes);
@@ -59,6 +60,7 @@ router.use('/admin/role', roleRoutes);
 router.use('/affiliate', affiliateRoutes);
 router.use('/contact', contactRoutes);
 router.use('/notification', notificationRoutes);
+router.use('/steadfast', steadfastRoutes);
 
 // Health check route
 router.get('/health', (req, res) => {
