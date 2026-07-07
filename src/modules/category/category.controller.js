@@ -4,7 +4,7 @@ const mongoose = require('mongoose');
 
 exports.createCategory = async (req, res) => {
   try {
-    const { name, slug, image, parent, isFeatured } = req.body;
+    const { name, slug, image, parent, isFeatured, bgClass } = req.body;
     if (!name || !slug) {
       return sendResponse({
         res,
@@ -22,7 +22,8 @@ exports.createCategory = async (req, res) => {
       slug, 
       image, 
       parent: parentValue,
-      isFeatured: isFeatured || false
+      isFeatured: isFeatured || false,
+      bgClass: bgClass || ''
     });
     await category.save();
     return sendResponse({
@@ -84,6 +85,8 @@ const getPaginatedCategories = async (filter, req, res, message) => {
           isActive: 1,
           isFeatured: 1,
           sortOrder: 1,
+          showOnHeader: 1,
+          headerSortOrder: 1,
           productCount: 1,
           createdAt: 1,
           updatedAt: 1
@@ -186,6 +189,8 @@ exports.getMainCategories = async (req, res) => {
           isActive: 1,
           isFeatured: 1,
           sortOrder: 1,
+          showOnHeader: 1,
+          headerSortOrder: 1,
           productCount: 1,
           createdAt: 1,
           updatedAt: 1
@@ -256,6 +261,8 @@ exports.getPaginatedMainCategories = async (req, res) => {
           isActive: 1,
           isFeatured: 1,
           sortOrder: 1,
+          showOnHeader: 1,
+          headerSortOrder: 1,
           productCount: 1,
           createdAt: 1,
           updatedAt: 1
@@ -356,6 +363,8 @@ exports.getHomepageCategories = async (req, res) => {
           isActive: 1,
           isFeatured: 1,
           sortOrder: 1,
+          showOnHeader: 1,
+          headerSortOrder: 1,
           productCount: 1,
           createdAt: 1,
           updatedAt: 1
@@ -423,7 +432,10 @@ exports.getFeaturedCategories = async (req, res) => {
           parent: 1,
           isActive: 1,
           isFeatured: 1,
+          bgClass: 1,
           sortOrder: 1,
+          showOnHeader: 1,
+          headerSortOrder: 1,
           productCount: 1,
           createdAt: 1,
           updatedAt: 1
@@ -490,7 +502,10 @@ exports.getCategoryById = async (req, res) => {
           parent: 1,
           isActive: 1,
           isFeatured: 1,
+          bgClass: 1,
           sortOrder: 1,
+          showOnHeader: 1,
+          headerSortOrder: 1,
           productCount: 1,
           createdAt: 1,
           updatedAt: 1

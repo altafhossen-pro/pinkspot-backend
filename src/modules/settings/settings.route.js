@@ -33,4 +33,8 @@ router.put('/affiliate', verifyToken, verifyTokenAdmin, settingsController.updat
 router.get('/steadfast', settingsController.getSteadfastSettings);
 router.put('/steadfast', verifyToken, verifyTokenAdmin, settingsController.updateSteadfastSettings);
 
+// Site settings endpoints
+router.get('/site-settings', settingsController.getSiteSettings);
+router.put('/site-settings', verifyToken, verifyTokenAdmin, settingsController.updateSiteSettings);
+
 module.exports = router;

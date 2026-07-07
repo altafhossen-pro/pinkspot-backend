@@ -3285,11 +3285,16 @@ exports.addOrderToSteadfast = async (req, res) => {
     const steadfastResponse = await steadfastService.createOrder(steadfastOrderData);
 
     if (!steadfastResponse.success) {
+      console.log('STEADFAST FULL ERROR:', JSON.stringify(steadfastResponse, null, 2));
       // Check if it's a credentials error and provide user-friendly message
-      let errorMessage = steadfastResponse.error?.message || 'Failed to add order to Steadfast Courier';
+      let errorMessage = steadfastResponse.error?.message 
+          || (typeof steadfastResponse.error === 'string' ? steadfastResponse.error : null)
+          || (steadfastResponse.error && Object.values(steadfastResponse.error).join(', '))
+          || 'Failed to add order to Steadfast Courier';
 
-      // If it's a credentials error, provide more helpful message
-      if (errorMessage.includes('credentials') || errorMessage.includes('configured')) {
+      // If it's specifically a credentials error, provide more helpful message. 
+      // But if Steadfast gave us a specific string like "Account is not active!", we should keep it.
+      if (errorMessage.includes('credentials') || errorMessage.includes('configured') || (steadfastResponse.statusCode === 401 && errorMessage === 'Failed to add order to Steadfast Courier')) {
         errorMessage = 'Steadfast Courier API credentials are not configured. Please go to Settings > Steadfast Configuration and add your API Key and Secret Key to enable order delivery integration.';
       }
 

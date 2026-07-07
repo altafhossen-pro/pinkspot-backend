@@ -3,39 +3,39 @@ const mongoose = require('mongoose');
 const settingsSchema = new mongoose.Schema({
   // Loyalty Points Settings - All loyalty related settings in one object
   loyaltySettings: {
-    coinPerItem: { 
-      type: Number, 
+    coinPerItem: {
+      type: Number,
       default: 1,
       min: 0,
       max: 100
     },
-    coinValue: { 
-      type: Number, 
+    coinValue: {
+      type: Number,
       default: 1, // 1 coin = 1 ৳
       min: 0.1,
       max: 100
     },
-    isLoyaltyEnabled: { 
-      type: Boolean, 
-      default: true 
+    isLoyaltyEnabled: {
+      type: Boolean,
+      default: true
     },
-    
+
     // Coin Earning Rules
-    earnOnDelivery: { 
-      type: Boolean, 
+    earnOnDelivery: {
+      type: Boolean,
       default: true // Earn coins when order is delivered (COD)
     },
-    earnOnPaymentSuccess: { 
-      type: Boolean, 
+    earnOnPaymentSuccess: {
+      type: Boolean,
       default: true // Earn coins when payment is successful
     },
-    
+
     // Minimum Settings (no maximum limit - user can pay entire order)
-    minRedeemAmount: { 
-      type: Number, 
+    minRedeemAmount: {
+      type: Number,
       default: 1 // Minimum ৳1 to redeem
     },
-    
+
     // Signup bonus coins
     signupBonusCoins: {
       type: Number,
@@ -67,13 +67,13 @@ const settingsSchema = new mongoose.Schema({
       min: 0
     }
   },
-  
+
   // General Settings
-  isActive: { 
-    type: Boolean, 
-    default: true 
+  isActive: {
+    type: Boolean,
+    default: true
   },
-  
+
   // Email & SMS Settings
   isSendOrderConfirmationEmail: {
     type: Boolean,
@@ -83,7 +83,7 @@ const settingsSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
-  
+
   // Affiliate Settings
   affiliateSettings: {
     // Discount for purchaser (who uses affiliate link)
@@ -132,13 +132,47 @@ const settingsSchema = new mongoose.Schema({
       default: ''
     }
   },
-  
+
   // Admin who last updated
-  updatedBy: { 
-    type: mongoose.Schema.Types.ObjectId, 
-    ref: 'User' 
+  updatedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
   },
   
+  // Site Settings (General Configuration)
+  siteSettings: {
+    logoUrl: { type: String, default: '' },
+    isVideoAutoplayEnabled: { type: Boolean, default: true },
+    videoMenu: {
+      isEnabled: { type: Boolean, default: false },
+      name: { type: String, default: 'Videos' },
+      url: { type: String, default: '/videos' },
+      backgroundColor: { type: String, default: '#FF0000' },
+      textColor: { type: String, default: '#FFFFFF' },
+      tailwindClasses: { type: String, default: '' }
+    },
+    topHeroBanner: {
+      type: { type: String, enum: ['image', 'video'], default: 'image' },
+      image: { type: String, default: '' },
+      videoUrl: { type: String, default: '' },
+      title: { type: String, default: '' },
+      subtitle: { type: String, default: '' },
+      buttonText: { type: String, default: '' },
+      link: { type: String, default: '' },
+      isActive: { type: Boolean, default: true }
+    },
+    storeFeatures: {
+      backgroundColor: { type: String, default: '#FF1493' },
+      textColor: { type: String, default: '#FFFFFF' },
+      iconColor: { type: String, default: '#FFFFFF' },
+      features: [{
+        icon: { type: String, default: 'Star' },
+        title: { type: String, default: '' },
+        subtitle: { type: String, default: '' }
+      }]
+    }
+  },
+
   // Order Source Colors for Dashboard Table Highlight
   orderSourceColors: {
     website: { type: String, default: '' },

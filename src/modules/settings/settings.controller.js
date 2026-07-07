@@ -6,13 +6,13 @@ const Settings = require('./settings.model');
 exports.getSettings = async (req, res) => {
   try {
     let settings = await Settings.findOne();
-    
+
     // If no settings exist, create default settings
     if (!settings) {
       settings = new Settings();
       await settings.save();
     }
-    
+
     return sendResponse({
       res,
       statusCode: 200,
@@ -35,9 +35,9 @@ exports.updateSettings = async (req, res) => {
   try {
     const updateData = req.body;
     updateData.updatedBy = req.user._id; // Set who updated it
-    
+
     let settings = await Settings.findOne();
-    
+
     if (!settings) {
       // Create new settings if none exist
       settings = new Settings(updateData);
@@ -45,9 +45,9 @@ exports.updateSettings = async (req, res) => {
       // Update existing settings
       Object.assign(settings, updateData);
     }
-    
+
     await settings.save();
-    
+
     return sendResponse({
       res,
       statusCode: 200,
@@ -69,10 +69,10 @@ exports.updateSettings = async (req, res) => {
 exports.resetSettings = async (req, res) => {
   try {
     await Settings.deleteMany({});
-    
+
     const defaultSettings = new Settings();
     await defaultSettings.save();
-    
+
     return sendResponse({
       res,
       statusCode: 200,
@@ -94,13 +94,13 @@ exports.resetSettings = async (req, res) => {
 exports.getLoyaltySettings = async (req, res) => {
   try {
     let settings = await Settings.findOne();
-    
+
     // If no settings exist, create default settings
     if (!settings) {
       settings = new Settings();
       await settings.save();
     }
-    
+
     return sendResponse({
       res,
       statusCode: 200,
@@ -126,20 +126,20 @@ exports.updateLoyaltySettings = async (req, res) => {
       'loyaltySettings': loyaltyData,
       updatedBy: req.user._id
     };
-    
+
     let settings = await Settings.findOne();
-    
+
     if (!settings) {
       // Create new settings if none exist
       settings = new Settings();
     }
-    
+
     // Update only loyalty settings
     Object.assign(settings.loyaltySettings, loyaltyData);
     settings.updatedBy = req.user._id;
-    
+
     await settings.save();
-    
+
     return sendResponse({
       res,
       statusCode: 200,
@@ -161,13 +161,13 @@ exports.updateLoyaltySettings = async (req, res) => {
 exports.getDeliveryChargeSettings = async (req, res) => {
   try {
     let settings = await Settings.findOne();
-    
+
     // If no settings exist, create default settings
     if (!settings) {
       settings = new Settings();
       await settings.save();
     }
-    
+
     return sendResponse({
       res,
       statusCode: 200,
@@ -189,20 +189,20 @@ exports.getDeliveryChargeSettings = async (req, res) => {
 exports.updateDeliveryChargeSettings = async (req, res) => {
   try {
     const deliveryChargeData = req.body;
-    
+
     let settings = await Settings.findOne();
-    
+
     if (!settings) {
       // Create new settings if none exist
       settings = new Settings();
     }
-    
+
     // Update only delivery charge settings
     Object.assign(settings.deliveryChargeSettings, deliveryChargeData);
     settings.updatedBy = req.user._id;
-    
+
     await settings.save();
-    
+
     return sendResponse({
       res,
       statusCode: 200,
@@ -224,13 +224,13 @@ exports.updateDeliveryChargeSettings = async (req, res) => {
 exports.getEmailSMSSettings = async (req, res) => {
   try {
     let settings = await Settings.findOne();
-    
+
     // If no settings exist, create default settings
     if (!settings) {
       settings = new Settings();
       await settings.save();
     }
-    
+
     return sendResponse({
       res,
       statusCode: 200,
@@ -255,14 +255,14 @@ exports.getEmailSMSSettings = async (req, res) => {
 exports.updateEmailSMSSettings = async (req, res) => {
   try {
     const { isSendOrderConfirmationEmail, isSendGuestOrderConfirmationSMS } = req.body;
-    
+
     let settings = await Settings.findOne();
-    
+
     if (!settings) {
       // Create new settings if none exist
       settings = new Settings();
     }
-    
+
     // Update email & SMS settings
     if (typeof isSendOrderConfirmationEmail === 'boolean') {
       settings.isSendOrderConfirmationEmail = isSendOrderConfirmationEmail;
@@ -270,11 +270,11 @@ exports.updateEmailSMSSettings = async (req, res) => {
     if (typeof isSendGuestOrderConfirmationSMS === 'boolean') {
       settings.isSendGuestOrderConfirmationSMS = isSendGuestOrderConfirmationSMS;
     }
-    
+
     settings.updatedBy = req.user._id;
-    
+
     await settings.save();
-    
+
     return sendResponse({
       res,
       statusCode: 200,
@@ -299,13 +299,13 @@ exports.updateEmailSMSSettings = async (req, res) => {
 exports.getAffiliateSettings = async (req, res) => {
   try {
     let settings = await Settings.findOne();
-    
+
     // If no settings exist, create default settings
     if (!settings) {
       settings = new Settings();
       await settings.save();
     }
-    
+
     return sendResponse({
       res,
       statusCode: 200,
@@ -327,20 +327,20 @@ exports.getAffiliateSettings = async (req, res) => {
 exports.updateAffiliateSettings = async (req, res) => {
   try {
     const affiliateData = req.body;
-    
+
     let settings = await Settings.findOne();
-    
+
     if (!settings) {
       // Create new settings if none exist
       settings = new Settings();
     }
-    
+
     // Update only affiliate settings
     Object.assign(settings.affiliateSettings, affiliateData);
     settings.updatedBy = req.user._id;
-    
+
     await settings.save();
-    
+
     return sendResponse({
       res,
       statusCode: 200,
@@ -362,13 +362,13 @@ exports.updateAffiliateSettings = async (req, res) => {
 exports.getSteadfastSettings = async (req, res) => {
   try {
     let settings = await Settings.findOne();
-    
+
     // If no settings exist, create default settings
     if (!settings) {
       settings = new Settings();
       await settings.save();
     }
-    
+
     return sendResponse({
       res,
       statusCode: 200,
@@ -390,26 +390,92 @@ exports.getSteadfastSettings = async (req, res) => {
 exports.updateSteadfastSettings = async (req, res) => {
   try {
     const steadfastData = req.body;
-    
+
     let settings = await Settings.findOne();
-    
+
     if (!settings) {
       // Create new settings if none exist
       settings = new Settings();
     }
-    
+
     // Update only steadfast settings
     Object.assign(settings.steadfastSettings, steadfastData);
     settings.updatedBy = req.user._id;
-    
+
     await settings.save();
-    
+
     return sendResponse({
       res,
       statusCode: 200,
       success: true,
       message: 'Steadfast settings updated successfully',
       data: settings.steadfastSettings
+    });
+  } catch (error) {
+    return sendResponse({
+      res,
+      statusCode: 500,
+      success: false,
+      message: error.message || 'Server error'
+    });
+  }
+};
+
+// Get site settings
+exports.getSiteSettings = async (req, res) => {
+  try {
+    let settings = await Settings.findOne();
+
+    // If no settings exist, create default settings
+    if (!settings) {
+      settings = new Settings();
+      await settings.save();
+    }
+
+    return sendResponse({
+      res,
+      statusCode: 200,
+      success: true,
+      message: 'Site settings retrieved successfully',
+      data: settings.siteSettings || {}
+    });
+  } catch (error) {
+    return sendResponse({
+      res,
+      statusCode: 500,
+      success: false,
+      message: error.message || 'Server error'
+    });
+  }
+};
+
+// Update site settings
+exports.updateSiteSettings = async (req, res) => {
+  try {
+    const siteData = req.body;
+
+    let settings = await Settings.findOne();
+
+    if (!settings) {
+      // Create new settings if none exist
+      settings = new Settings();
+    }
+
+    // Update only site settings
+    if (!settings.siteSettings) {
+      settings.siteSettings = {};
+    }
+    Object.assign(settings.siteSettings, siteData);
+    settings.updatedBy = req.user._id;
+
+    await settings.save();
+
+    return sendResponse({
+      res,
+      statusCode: 200,
+      success: true,
+      message: 'Site settings updated successfully',
+      data: settings.siteSettings
     });
   } catch (error) {
     return sendResponse({

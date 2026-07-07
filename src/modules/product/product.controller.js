@@ -319,27 +319,68 @@ exports.getRandomProducts = async (req, res) => {
 // Get products with videos (only products that have at least 1 video)
 exports.getProductVideos = async (req, res) => {
   try {
-    const products = await Product.find({
-      productVideos: { $exists: true, $ne: [] },
-      isActive: true,
-      status: 'published'
-    })
-      .select('title productVideos slug featuredImage')
-      .sort('-createdAt');
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 12;
+    const skip = (page - 1) * limit;
 
-    // Filter out products with empty video arrays (double check)
-    const productsWithVideos = products.filter(product => 
-      product.productVideos && 
-      Array.isArray(product.productVideos) && 
-      product.productVideos.length > 0
-    );
+    const pipeline = [
+      {
+        $match: {
+          productVideos: { $exists: true, $ne: [], $type: 'array' },
+          isActive: true,
+          status: 'published'
+        }
+      },
+      {
+        $unwind: "$productVideos"
+      },
+      {
+        $match: {
+          productVideos: { 
+            $ne: null, 
+            $ne: "", 
+            $regex: /youtube\.com|youtu\.be/i 
+          }
+        }
+      },
+      {
+        $project: {
+          _id: 1,
+          title: 1,
+          slug: 1,
+          featuredImage: 1,
+          videoUrl: "$productVideos"
+        }
+      },
+      {
+        $sort: { createdAt: -1, _id: -1 }
+      }
+    ];
+
+    const totalPipeline = [...pipeline, { $count: "total" }];
+    const totalResult = await Product.aggregate(totalPipeline);
+    const total = totalResult.length > 0 ? totalResult[0].total : 0;
+
+    const paginatedPipeline = [
+      ...pipeline,
+      { $skip: skip },
+      { $limit: limit }
+    ];
+
+    const videos = await Product.aggregate(paginatedPipeline);
 
     return sendResponse({
       res,
       statusCode: 200,
       success: true,
       message: 'Product videos fetched successfully',
-      data: productsWithVideos,
+      data: videos,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
     });
   } catch (error) {
     return sendResponse({

@@ -7,6 +7,7 @@ const categorySchema = new mongoose.Schema({
   parent: { type: mongoose.Schema.Types.ObjectId, ref: 'Category', default: null },
   isActive: { type: Boolean, default: true },
   isFeatured: { type: Boolean, default: false },
+  bgClass: { type: String, default: '' },
   sortOrder: { type: Number, default: 0 },
   showOnHeader: { type: Boolean, default: false },
   headerSortOrder: { type: Number, default: 0 },
