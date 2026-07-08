@@ -19,12 +19,12 @@ const allowedOrigins = [
     'http://localhost:3001',
     'http://127.0.0.1:3000',
     'http://64.227.133.212',
-    'http://forpink.com',
-    'https://forpink.com',
-    'http://www.forpink.com',
-    'https://www.forpink.com',
-    'http://api.forpink.com',
-    'https://api.forpink.com',
+    'http://pinkspot.bd',
+    'https://pinkspot.bd',
+    'http://www.pinkspot.bd',
+    'https://www.pinkspot.bd',
+    'http://api.pinkspot.bd',
+    'https://api.pinkspot.bd',
     'http://64.227.133.212:3000'
 ];
 
