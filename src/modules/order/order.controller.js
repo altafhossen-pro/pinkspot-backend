@@ -40,7 +40,7 @@ exports.createOrder = async (req, res) => {
     // Validate each item's product ID
     for (let i = 0; i < orderData.items.length; i++) {
       const item = orderData.items[i];
-      
+
       if (!item.product) {
         return sendResponse({
           res,
@@ -113,11 +113,11 @@ exports.createOrder = async (req, res) => {
     // Validate product prices against actual product prices in database
     for (let i = 0; i < orderData.items.length; i++) {
       const item = orderData.items[i];
-      
+
       try {
         // Fetch product from database
         const product = await Product.findById(item.product);
-        
+
         if (!product) {
           return sendResponse({
             res,
@@ -139,11 +139,11 @@ exports.createOrder = async (req, res) => {
 
         // Determine actual price based on variant or base price
         let actualPrice = null;
-        
+
         // If variant SKU is provided, check variant price
         if (item.variantSku && product.variants && product.variants.length > 0) {
           const variant = product.variants.find(v => v.sku === item.variantSku);
-          
+
           if (!variant) {
             return sendResponse({
               res,
@@ -2564,7 +2564,7 @@ exports.createGuestOrder = async (req, res) => {
           const totalAmount = order.total.toFixed(2);
 
           // Professional short SMS message
-          const smsMessage = `Forpink: Order #${order.orderId} confirmed. Total: ৳${totalAmount}. Track: ${trackingUrl}`;
+          const smsMessage = `Pinkspot: Order #${order.orderId} confirmed. Total: ৳${totalAmount}. Track: ${trackingUrl}`;
 
           // Send SMS asynchronously (don't wait for it to complete)
           sendCustomSMS(guestPhone, smsMessage).catch(smsError => {
@@ -2812,7 +2812,7 @@ exports.createManualOrder = async (req, res) => {
           const totalAmount = order.total.toFixed(2);
 
           // Professional short SMS message
-          const smsMessage = `Forpink: Order #${order.orderId} confirmed. Total: ৳${totalAmount}. Track: ${trackingUrl}`;
+          const smsMessage = `Pinkspot: Order #${order.orderId} confirmed. Total: ৳${totalAmount}. Track: ${trackingUrl}`;
 
           // Send SMS asynchronously (don't wait for it to complete)
           sendCustomSMS(guestInfo.phone, smsMessage).catch(smsError => {
@@ -3349,10 +3349,10 @@ exports.addOrderToSteadfast = async (req, res) => {
     if (!steadfastResponse.success) {
       console.log('STEADFAST FULL ERROR:', JSON.stringify(steadfastResponse, null, 2));
       // Check if it's a credentials error and provide user-friendly message
-      let errorMessage = steadfastResponse.error?.message 
-          || (typeof steadfastResponse.error === 'string' ? steadfastResponse.error : null)
-          || (steadfastResponse.error && Object.values(steadfastResponse.error).join(', '))
-          || 'Failed to add order to Steadfast Courier';
+      let errorMessage = steadfastResponse.error?.message
+        || (typeof steadfastResponse.error === 'string' ? steadfastResponse.error : null)
+        || (steadfastResponse.error && Object.values(steadfastResponse.error).join(', '))
+        || 'Failed to add order to Steadfast Courier';
 
       // If it's specifically a credentials error, provide more helpful message. 
       // But if Steadfast gave us a specific string like "Account is not active!", we should keep it.

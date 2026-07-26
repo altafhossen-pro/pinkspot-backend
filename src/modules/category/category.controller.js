@@ -89,7 +89,8 @@ const getPaginatedCategories = async (filter, req, res, message) => {
           headerSortOrder: 1,
           productCount: 1,
           createdAt: 1,
-          updatedAt: 1
+          updatedAt: 1,
+          banner: 1
         }
       },
       {
@@ -193,7 +194,8 @@ exports.getMainCategories = async (req, res) => {
           headerSortOrder: 1,
           productCount: 1,
           createdAt: 1,
-          updatedAt: 1
+          updatedAt: 1,
+          banner: 1
         }
       },
       {
@@ -265,7 +267,8 @@ exports.getPaginatedMainCategories = async (req, res) => {
           headerSortOrder: 1,
           productCount: 1,
           createdAt: 1,
-          updatedAt: 1
+          updatedAt: 1,
+          banner: 1
         }
       },
       {
@@ -367,7 +370,8 @@ exports.getHomepageCategories = async (req, res) => {
           headerSortOrder: 1,
           productCount: 1,
           createdAt: 1,
-          updatedAt: 1
+          updatedAt: 1,
+          banner: 1
         }
       },
       {
@@ -438,7 +442,8 @@ exports.getFeaturedCategories = async (req, res) => {
           headerSortOrder: 1,
           productCount: 1,
           createdAt: 1,
-          updatedAt: 1
+          updatedAt: 1,
+          banner: 1
         }
       },
       {
@@ -508,7 +513,8 @@ exports.getCategoryById = async (req, res) => {
           headerSortOrder: 1,
           productCount: 1,
           createdAt: 1,
-          updatedAt: 1
+          updatedAt: 1,
+          banner: 1
         }
       }
     ]);

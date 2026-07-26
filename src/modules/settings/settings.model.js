@@ -173,7 +173,8 @@ const settingsSchema = new mongoose.Schema({
         icon: { type: String, default: 'Star' },
         title: { type: String, default: '' },
         subtitle: { type: String, default: '' }
-      }]
+      }],
+      lowStockThreshold: { type: Number, default: 10 }
     }
   },
 

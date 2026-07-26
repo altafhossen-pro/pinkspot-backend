@@ -3,6 +3,7 @@ const { Order } = require('../../order/order.model');
 const { Product } = require('../../product/product.model');
 const { Category } = require('../../category/category.model');
 const Coupon = require('../../coupon/coupon.model');
+const Settings = require('../../settings/settings.model');
 const sendResponse = require('../../../utils/sendResponse');
 
 // Get comprehensive dashboard statistics
@@ -241,12 +242,16 @@ exports.getDashboardStats = async (req, res) => {
       .select('title totalSold featuredImage priceRange')
       .populate('category', 'name');
 
+    // Get low stock threshold from settings
+    const settings = await Settings.findOne();
+    const lowStockThreshold = settings?.siteSettings?.lowStockThreshold ?? 10;
+
     // Low stock products
     const lowStockProducts = await Product.find({
       isActive: true,
       $or: [
-        { totalStock: { $lte: 5 } },
-        { 'variants.stockQuantity': { $lte: 5 } }
+        { totalStock: { $lte: lowStockThreshold } },
+        { 'variants.stockQuantity': { $lte: lowStockThreshold } }
       ]
     })
     .limit(5)
@@ -417,7 +422,8 @@ exports.getDashboardStats = async (req, res) => {
         },
         products: {
           topSelling: topProducts,
-          lowStock: lowStockProducts
+          lowStock: lowStockProducts,
+          lowStockThreshold: lowStockThreshold
         },
         customers: {
           total: totalUsers,
@@ -536,12 +542,16 @@ exports.getProductAnalytics = async (req, res) => {
       .select('title totalSold averageRating totalReviews priceRange featuredImage')
       .populate('category', 'name');
 
+    // Get low stock threshold from settings
+    const settings = await Settings.findOne();
+    const lowStockThreshold = settings?.siteSettings?.lowStockThreshold ?? 10;
+
     // Low stock products
     const lowStock = await Product.find({
       isActive: true,
       $or: [
-        { totalStock: { $lte: 5 } },
-        { 'variants.stockQuantity': { $lte: 5 } }
+        { totalStock: { $lte: lowStockThreshold } },
+        { 'variants.stockQuantity': { $lte: lowStockThreshold } }
       ]
     })
     .sort({ totalStock: 1 })

@@ -21,7 +21,7 @@ class OTPService {
    * Send OTP to phone number via SMS
    * @param {string} phone - Phone number
    * @param {string} otp - OTP to send
-   * @param {string} brandName - Optional brand name (defaults to env variable or 'Forpink')
+   * @param {string} brandName - Optional brand name (defaults to env variable or 'Pinkspot')
    * @returns {Promise<boolean>} Success status
    */
   async sendOTP(phone, otp, brandName = null) {

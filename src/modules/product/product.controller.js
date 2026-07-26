@@ -1,4 +1,6 @@
 const { Product } = require('./product.model');
+const { Category } = require('../category/category.model');
+const Settings = require('../settings/settings.model');
 const { StockTracking } = require('../inventory/stockTracking.model');
 const sendResponse = require('../../utils/sendResponse');
 const mongoose = require('mongoose');
@@ -73,6 +75,17 @@ exports.createProduct = async (req, res) => {
     // Sanitize slug to remove leading/trailing hyphens
     if (req.body.slug) {
       req.body.slug = sanitizeSlug(req.body.slug);
+    }
+    
+    // Handle empty category field - convert empty string to null to prevent CastError
+    if (req.body.category === '') {
+      req.body.category = null;
+    }
+    
+    if (req.body.subCategories === '') {
+      req.body.subCategories = [];
+    } else if (Array.isArray(req.body.subCategories)) {
+      req.body.subCategories = req.body.subCategories.filter(sub => sub !== '');
     }
     
     const product = new Product(req.body);
@@ -194,7 +207,16 @@ exports.getAdminProducts = async (req, res) => {
 
     // Status filter (if not 'all')
     if (statusFilter && statusFilter !== 'all') {
-      queryFilter.status = statusFilter;
+      if (statusFilter === 'low_stock') {
+        const settings = await Settings.findOne();
+        const lowStockThreshold = settings?.siteSettings?.lowStockThreshold ?? 10;
+        queryFilter.$or = [
+          { totalStock: { $lte: lowStockThreshold } },
+          { 'variants.stockQuantity': { $lte: lowStockThreshold } }
+        ];
+      } else {
+        queryFilter.status = statusFilter;
+      }
     }
 
     // Search functionality - includes SKU, title, slug, brand
@@ -217,12 +239,26 @@ exports.getAdminProducts = async (req, res) => {
       .skip(skip)
       .limit(limit);
 
+    let processedProducts = products;
+    if (statusFilter === 'low_stock') {
+        const settings = await Settings.findOne();
+        const lowStockThreshold = settings?.siteSettings?.lowStockThreshold ?? 10;
+        
+        processedProducts = products.map(doc => {
+            const product = doc.toObject({ virtuals: true });
+            if (product.variants && product.variants.length > 0) {
+                product.variants = product.variants.filter(v => v.stockQuantity <= lowStockThreshold);
+            }
+            return product;
+        });
+    }
+
     return sendResponse({
       res,
       statusCode: 200,
       success: true,
       message: 'Admin products fetched successfully',
-      data: products,
+      data: processedProducts,
       pagination: {
         total,
         page,
@@ -806,6 +842,17 @@ exports.updateProduct = async (req, res) => {
     // Sanitize slug to remove leading/trailing hyphens
     if (updates.slug) {
       updates.slug = sanitizeSlug(updates.slug);
+    }
+    
+    // Handle empty category field - convert empty string to null to prevent CastError
+    if (updates.category === '') {
+      updates.category = null;
+    }
+    
+    if (updates.subCategories === '') {
+      updates.subCategories = [];
+    } else if (Array.isArray(updates.subCategories)) {
+      updates.subCategories = updates.subCategories.filter(sub => sub !== '');
     }
     
     // Get the original product to compare stock changes
