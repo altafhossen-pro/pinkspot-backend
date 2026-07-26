@@ -714,3 +714,42 @@ exports.getHeaderCategories = async (req, res) => {
     });
   }
 };
+
+exports.reorderCategories = async (req, res) => {
+  try {
+    const { categories } = req.body;
+    if (!Array.isArray(categories)) {
+      return sendResponse({
+        res,
+        statusCode: 400,
+        success: false,
+        message: 'Invalid data format. Expected an array of categories.',
+      });
+    }
+
+    const bulkOps = categories.map(cat => ({
+      updateOne: {
+        filter: { _id: cat.id },
+        update: { $set: { sortOrder: cat.sortOrder } }
+      }
+    }));
+
+    if (bulkOps.length > 0) {
+      await Category.bulkWrite(bulkOps);
+    }
+
+    return sendResponse({
+      res,
+      statusCode: 200,
+      success: true,
+      message: 'Categories reordered successfully',
+    });
+  } catch (error) {
+    return sendResponse({
+      res,
+      statusCode: 500,
+      success: false,
+      message: error.message || 'Server error',
+    });
+  }
+};
