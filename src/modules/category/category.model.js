@@ -11,6 +11,7 @@ const categorySchema = new mongoose.Schema({
   sortOrder: { type: Number, default: 0 },
   showOnHeader: { type: Boolean, default: false },
   headerSortOrder: { type: Number, default: 0 },
+  showChildAsSubMenu: { type: Boolean, default: false },
   banner: {
     url: { type: String, default: '' },
     isActive: { type: Boolean, default: false }

@@ -700,7 +700,12 @@ exports.getCategoriesForMegamenu = async (req, res) => {
 exports.getHeaderCategories = async (req, res) => {
   try {
     const categories = await Category.find({ isActive: true, showOnHeader: true })
-      .select('_id name slug image parent headerSortOrder')
+      .populate({
+        path: 'children',
+        match: { isActive: true },
+        select: '_id name slug image'
+      })
+      .select('_id name slug image parent headerSortOrder showChildAsSubMenu')
       .sort({ headerSortOrder: 1, name: 1 })
       .lean();
 
@@ -759,3 +764,80 @@ exports.reorderCategories = async (req, res) => {
     });
   }
 };
+
+exports.getCategoryBySlug = async (req, res) => {
+  try {
+    const { slug } = req.params;
+    
+    // Get category with product count
+    const categories = await Category.aggregate([
+      {
+        $match: { slug: slug }
+      },
+      {
+        $lookup: {
+          from: 'products',
+          localField: '_id',
+          foreignField: 'category',
+          as: 'products'
+        }
+      },
+      {
+        $addFields: {
+          productCount: { $size: '$products' }
+        }
+      },
+      {
+        $project: {
+          name: 1,
+          slug: 1,
+          image: 1,
+          parent: 1,
+          isActive: 1,
+          isFeatured: 1,
+          bgClass: 1,
+          sortOrder: 1,
+          showOnHeader: 1,
+          headerSortOrder: 1,
+          productCount: 1,
+          createdAt: 1,
+          updatedAt: 1,
+          banner: 1
+        }
+      }
+    ]);
+
+    if (!categories || categories.length === 0) {
+      return sendResponse({
+        res,
+        statusCode: 404,
+        success: false,
+        message: 'Category not found',
+      });
+    }
+
+    const category = categories[0];
+    
+    // Populate parent and children references
+    const populatedCategory = await Category.populate(category, [
+      { path: 'parent' },
+      { path: 'children' }
+    ]);
+
+    return sendResponse({
+      res,
+      statusCode: 200,
+      success: true,
+      message: 'Category fetched successfully',
+      data: populatedCategory,
+    });
+  } catch (error) {
+    return sendResponse({
+      res,
+      statusCode: 500,
+      success: false,
+      message: error.message || 'Server error',
+    });
+  }
+};
+

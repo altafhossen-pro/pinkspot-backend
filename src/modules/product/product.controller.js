@@ -21,7 +21,28 @@ const getPaginatedProducts = async (filter, req, res, message) => {
 
     // Additional filters from query
     const queryFilter = { ...filter };
-    if (req.query.category) queryFilter.category = req.query.category;
+    
+    if (req.query.category) {
+      const categoryIds = req.query.category.split(',').map(id => id.trim());
+      
+      try {
+        const { Category } = require('../category/category.model');
+        const childCategories = await Category.find({
+          parent: { $in: categoryIds }
+        }).select('_id');
+        
+        const allCategoryIds = [
+          ...categoryIds,
+          ...childCategories.map(child => child._id.toString())
+        ];
+        
+        queryFilter.category = { $in: allCategoryIds };
+      } catch (err) {
+        // Fallback if category model query fails
+        queryFilter.category = { $in: categoryIds };
+      }
+    }
+    
     if (req.query.brand) queryFilter.brand = req.query.brand;
     if (req.query.minPrice) queryFilter['priceRange.min'] = { $gte: Number(req.query.minPrice) };
     if (req.query.maxPrice) queryFilter['priceRange.max'] = { $lte: Number(req.query.maxPrice) };
@@ -230,6 +251,24 @@ exports.getAdminProducts = async (req, res) => {
         { brand: { $regex: searchQuery, $options: 'i' } },
         { 'variants.sku': { $regex: searchQuery, $options: 'i' } }
       ];
+    }
+
+    if (req.query.category) {
+      const categoryIds = req.query.category.split(',').map(id => id.trim());
+      
+      // Get all child categories for the selected parent categories
+      const { Category } = require('../category/category.model');
+      const childCategories = await Category.find({
+        parent: { $in: categoryIds }
+      }).select('_id');
+      
+      // Combine parent and child category IDs
+      const allCategoryIds = [
+        ...categoryIds,
+        ...childCategories.map(child => child._id.toString())
+      ];
+      
+      queryFilter.category = { $in: allCategoryIds };
     }
 
     const total = await Product.countDocuments(queryFilter);

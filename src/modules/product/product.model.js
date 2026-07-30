@@ -127,6 +127,7 @@ const productSchema = new mongoose.Schema({
     default: 'draft',
   },
   isActive: { type: Boolean, default: true },
+  isForceOutOfStock: { type: Boolean, default: false },
   isFeatured: { type: Boolean, default: false },
   isBestselling: { type: Boolean, default: false },
   isNewArrival: { type: Boolean, default: false },

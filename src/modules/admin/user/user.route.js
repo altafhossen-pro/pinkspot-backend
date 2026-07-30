@@ -9,6 +9,7 @@ router.post('/login', userController.adminLogin);
 
 // Protected admin routes (require admin token)
 router.use(verifyTokenAdmin);
+router.post('/customer', checkPermission('user', 'create'), userController.createCustomer);
 router.get('/', checkPermission('user', 'read'), userController.listUsers);
 router.get('/search', checkPermission('user', 'read'), userController.searchUsers);
 router.get('/:id', checkPermission('user', 'read'), userController.getUserById);

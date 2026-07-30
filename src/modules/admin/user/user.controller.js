@@ -19,7 +19,7 @@ exports.listUsers = async (req, res) => {
     // Build query filter
     let queryFilter = {};
     const andConditions = [];
-    
+
     // Search filter
     if (search) {
       andConditions.push({
@@ -35,7 +35,7 @@ exports.listUsers = async (req, res) => {
     if (status) {
       queryFilter.status = status;
     }
-    
+
     // Customers only filter (role='customer' AND roleId is null/doesn't exist)
     if (customersOnly) {
       andConditions.push({
@@ -70,7 +70,7 @@ exports.listUsers = async (req, res) => {
       const baseFilter = { ...queryFilter };
       // Clear queryFilter to rebuild
       Object.keys(queryFilter).forEach(key => delete queryFilter[key]);
-      
+
       // Build $and array - only include baseFilter if it has properties
       if (Object.keys(baseFilter).length > 0) {
         queryFilter.$and = [baseFilter, ...andConditions];
@@ -94,11 +94,11 @@ exports.listUsers = async (req, res) => {
       .skip(skip)
       .limit(limit);
 
-    return sendResponse({ 
-      res, 
-      statusCode: 200, 
-      success: true, 
-      message: 'Users fetched successfully', 
+    return sendResponse({
+      res,
+      statusCode: 200,
+      success: true,
+      message: 'Users fetched successfully',
       data: users,
       pagination: {
         total,
@@ -116,10 +116,10 @@ exports.getUserById = async (req, res) => {
   try {
     const user = await User.findById(req.params.id).populate('roleId', 'name isSuperAdmin');
     if (!user) return sendResponse({ res, statusCode: 404, success: false, message: 'User not found' });
-    
+
     // Check if target user is staff (has roleId)
     const targetIsStaff = user.roleId && user.roleId._id;
-    
+
     // If target user is staff, only Super Admin can view/edit
     if (targetIsStaff) {
       // Resolve requester super admin status
@@ -128,17 +128,17 @@ exports.getUserById = async (req, res) => {
         const requesterRole = await Role.findById(req.user.roleId);
         requesterIsSuperAdmin = !!requesterRole?.isSuperAdmin;
       }
-      
+
       if (!requesterIsSuperAdmin) {
-        return sendResponse({ 
-          res, 
-          statusCode: 403, 
-          success: false, 
-          message: "Only Super Admin can view or edit staff user data" 
+        return sendResponse({
+          res,
+          statusCode: 403,
+          success: false,
+          message: "Only Super Admin can view or edit staff user data"
         });
       }
     }
-    
+
     return sendResponse({ res, statusCode: 200, success: true, message: 'User fetched', data: user });
   } catch (error) {
     return sendResponse({ res, statusCode: 500, success: false, message: error.message });
@@ -148,36 +148,36 @@ exports.getUserById = async (req, res) => {
 exports.updateUser = async (req, res) => {
   try {
     const updateData = { ...req.body };
-    
+
     // Fetch the target user first to check if they are staff
     const targetUser = await User.findById(req.params.id).populate('roleId', 'name isSuperAdmin');
     if (!targetUser) {
       return sendResponse({ res, statusCode: 404, success: false, message: 'User not found' });
     }
-    
+
     // Check if target user is staff (has roleId)
     const targetIsStaff = targetUser.roleId && targetUser.roleId._id;
-    
+
     // Check if user is trying to update their own account
     const isSelfUpdate = String(req.params.id) === String(req.user._id);
-    
+
     // Resolve requester super admin status
     let requesterIsSuperAdmin = false;
     if (req.user?.roleId) {
       const requesterRole = await Role.findById(req.user.roleId);
       requesterIsSuperAdmin = !!requesterRole?.isSuperAdmin;
     }
-    
+
     // If target user is staff, only Super Admin can update
     if (targetIsStaff && !requesterIsSuperAdmin) {
-      return sendResponse({ 
-        res, 
-        statusCode: 403, 
-        success: false, 
-        message: "Only Super Admin can update staff user data" 
+      return sendResponse({
+        res,
+        statusCode: 403,
+        success: false,
+        message: "Only Super Admin can update staff user data"
       });
     }
-    
+
     // Check if email is being updated - only Super Admin can change emails
     if (Object.prototype.hasOwnProperty.call(updateData, 'email')) {
       // Use targetUser that was already fetched
@@ -188,25 +188,25 @@ exports.updateUser = async (req, res) => {
         }
       }
     }
-    
+
     // Check if roleId is being updated
     if (Object.prototype.hasOwnProperty.call(updateData, 'roleId')) {
       // Check if user has role.update permission (module: 'role', action: 'update')
       const hasRoleUpdatePermission = await checkUserPermission(req.user, 'role', 'update');
-      
+
       // Require role.update permission (unless super admin)
       if (!requesterIsSuperAdmin && !hasRoleUpdatePermission) {
         return sendResponse({ res, statusCode: 403, success: false, message: "Permission Denied: You don't have permission to change user roles. Please contact your administrator to grant Role Management access." });
       }
-      
+
       // Prevent non-Super Admin users from updating their own role
       if (isSelfUpdate && !requesterIsSuperAdmin) {
         return sendResponse({ res, statusCode: 403, success: false, message: "You cannot update your own role. Only Super Admin can update their own role." });
       }
-      
+
       const roleIdValue = updateData.roleId;
       const hasAdminRole = roleIdValue && String(roleIdValue).trim().length > 0;
-      
+
       // If assigning a role, check if it's a Super Admin role
       if (hasAdminRole) {
         const assignedRole = await Role.findById(roleIdValue);
@@ -218,7 +218,7 @@ exports.updateUser = async (req, res) => {
         }
       }
     }
-    
+
     // Determine legacy role string based on roleId presence
     // If roleId provided (non-empty), treat as admin access; otherwise default to customer
     let updateQuery = { $set: updateData };
@@ -304,6 +304,62 @@ exports.createUser = async (req, res) => {
   }
 };
 
+exports.createCustomer = async (req, res) => {
+  try {
+    const { name, email, phone, password, address, status } = req.body;
+
+    if (!name || !email || !password) {
+      return sendResponse({
+        res,
+        statusCode: 400,
+        success: false,
+        message: 'Name, email, and password are required',
+      });
+    }
+
+    const existingUser = await User.findOne({
+      $or: [
+        { email: email.toLowerCase() },
+        ...(phone ? [{ phone }] : [])
+      ]
+    });
+
+    if (existingUser) {
+      return sendResponse({
+        res,
+        statusCode: 409,
+        success: false,
+        message: 'User with this email or phone already exists',
+      });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const userData = {
+      name,
+      email: email.toLowerCase(),
+      password: hashedPassword,
+      phone,
+      address,
+      status: status || 'active',
+      role: 'customer',
+      registerType: 'email'
+    };
+
+    const user = new User(userData);
+    await user.save();
+
+    const userObj = user.toObject();
+    delete userObj.password;
+
+    return sendResponse({ res, statusCode: 201, success: true, message: 'Customer created successfully', data: userObj });
+  } catch (error) {
+    return sendResponse({ res, statusCode: 500, success: false, message: error.message });
+  }
+};
+
+
+
 exports.searchUsers = async (req, res) => {
   try {
     const { q: query } = req.query;
@@ -324,8 +380,8 @@ exports.searchUsers = async (req, res) => {
         { phone: { $regex: query, $options: 'i' } }
       ]
     })
-    .select('name email phone')
-    .limit(5);
+      .select('name email phone')
+      .limit(5);
 
     return sendResponse({
       res,
@@ -369,7 +425,7 @@ exports.adminLogin = async (req, res) => {
       });
     }
 
-    
+
     const isPasswordValid = await bcrypt.compare(password, admin.password);
     if (!isPasswordValid) {
       return sendResponse({
@@ -392,9 +448,9 @@ exports.adminLogin = async (req, res) => {
       statusCode: 200,
       success: true,
       message: 'Admin login successful',
-      data: { 
-        admin: adminObj, 
-        token 
+      data: {
+        admin: adminObj,
+        token
       },
     });
 
@@ -418,13 +474,13 @@ exports.createStaff = async (req, res) => {
       const requesterRole = await Role.findById(req.user.roleId);
       requesterIsSuperAdmin = !!requesterRole?.isSuperAdmin;
     }
-    
+
     if (!requesterIsSuperAdmin) {
-      return sendResponse({ 
-        res, 
-        statusCode: 403, 
-        success: false, 
-        message: "Only Super Admin can create staff members" 
+      return sendResponse({
+        res,
+        statusCode: 403,
+        success: false,
+        message: "Only Super Admin can create staff members"
       });
     }
 
@@ -486,7 +542,7 @@ exports.createStaff = async (req, res) => {
           message: 'Invalid role ID',
         });
       }
-      
+
       // Only Super Admin can assign Super Admin role (already checked above)
       if (assignedRole.isSuperAdmin && !requesterIsSuperAdmin) {
         return sendResponse({
@@ -496,7 +552,7 @@ exports.createStaff = async (req, res) => {
           message: 'Only Super Admin can assign Super Admin role',
         });
       }
-      
+
       userData.roleId = roleId;
     }
 
@@ -508,20 +564,20 @@ exports.createStaff = async (req, res) => {
     const userObj = user.toObject();
     delete userObj.password;
 
-    return sendResponse({ 
-      res, 
-      statusCode: 201, 
-      success: true, 
-      message: 'Staff member created successfully', 
-      data: userObj 
+    return sendResponse({
+      res,
+      statusCode: 201,
+      success: true,
+      message: 'Staff member created successfully',
+      data: userObj
     });
   } catch (error) {
     console.error('Error creating staff:', error);
-    return sendResponse({ 
-      res, 
-      statusCode: 500, 
-      success: false, 
-      message: error.message || 'Error creating staff member' 
+    return sendResponse({
+      res,
+      statusCode: 500,
+      success: false,
+      message: error.message || 'Error creating staff member'
     });
   }
 };

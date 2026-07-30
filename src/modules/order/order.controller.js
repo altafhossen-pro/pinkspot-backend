@@ -137,6 +137,16 @@ exports.createOrder = async (req, res) => {
           });
         }
 
+        // Check if product is force out of stock
+        if (product.isForceOutOfStock) {
+          return sendResponse({
+            res,
+            statusCode: 400,
+            success: false,
+            message: `Item ${i + 1}: Product "${product.title}" is currently out of stock`
+          });
+        }
+
         // Determine actual price based on variant or base price
         let actualPrice = null;
 
@@ -1127,7 +1137,9 @@ exports.getUserOrderById = async (req, res) => {
 exports.getOrderById = async (req, res) => {
   try {
     const { id } = req.params;
-    const order = await Order.findOne({ _id: id, isDeleted: false }).populate('user', 'name email phone');
+    const order = await Order.findOne({ _id: id, isDeleted: false })
+      .populate('user', 'name email phone')
+      .populate('items.product', 'totalStock variants isForceOutOfStock');
     if (!order) {
       return sendResponse({
         res,
@@ -1285,7 +1297,7 @@ exports.updateOrder = async (req, res) => {
               // Update totalStock and save to trigger any middleware
               const product = await Product.findById(item.product);
               product.totalStock = updatedTotalStock;
-              await product.save();
+              await product.save({ validateBeforeSave: false });
 
               // Create stock tracking record for sold items
               const stockTracking = new StockTracking({
@@ -1389,7 +1401,7 @@ exports.updateOrder = async (req, res) => {
                   // Update totalStock and save to trigger any middleware
                   const product = await Product.findById(item.product);
                   product.totalStock = updatedTotalStock;
-                  await product.save();
+                  await product.save({ validateBeforeSave: false });
 
                   // Create stock tracking record for returned items (adjusts sold count)
                   const stockTracking = new StockTracking({
@@ -1483,7 +1495,7 @@ exports.updateOrder = async (req, res) => {
                 // Update totalStock and save to trigger any middleware
                 const product = await Product.findById(item.product);
                 product.totalStock = updatedTotalStock;
-                await product.save();
+                await product.save({ validateBeforeSave: false });
 
                 // Create stock tracking record for returned items (adjusts sold count)
                 const stockTracking = new StockTracking({
@@ -1993,7 +2005,7 @@ exports.updateOrderComprehensive = async (req, res) => {
             const prod = await Product.findById(productId);
             if (prod) {
               prod.totalStock = updatedTotalStock;
-              await prod.save();
+              await prod.save({ validateBeforeSave: false });
             }
           }
         } else {
@@ -2015,7 +2027,7 @@ exports.updateOrderComprehensive = async (req, res) => {
             const prod = await Product.findById(productId);
             if (prod) {
               prod.totalStock = updatedTotalStock;
-              await prod.save();
+              await prod.save({ validateBeforeSave: false });
             }
           }
         } else {
@@ -2038,7 +2050,7 @@ exports.updateOrderComprehensive = async (req, res) => {
             const prod = await Product.findById(productId);
             if (prod) {
               prod.totalStock = updatedTotalStock;
-              await prod.save();
+              await prod.save({ validateBeforeSave: false });
             }
           }
         } else {
@@ -2059,7 +2071,7 @@ exports.updateOrderComprehensive = async (req, res) => {
             const prod = await Product.findById(productId);
             if (prod) {
               prod.totalStock = updatedTotalStock;
-              await prod.save();
+              await prod.save({ validateBeforeSave: false });
             }
           }
         } else {
@@ -3405,6 +3417,136 @@ exports.addOrderToSteadfast = async (req, res) => {
       success: false,
       message: error.message || 'Server error',
     });
+  }
+};
+
+exports.updateOrderByUser = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const orderData = req.body;
+
+    // Find the order
+    const order = await Order.findOne({ _id: id, user: req.user._id });
+    
+    if (!order) {
+      return sendResponse({ res, statusCode: 404, success: false, message: 'Order not found' });
+    }
+
+    // Only allow editing if status is pending
+    if (order.status !== 'pending') {
+      return sendResponse({ res, statusCode: 400, success: false, message: 'Only pending orders can be edited' });
+    }
+
+    if (!orderData.items || !Array.isArray(orderData.items) || orderData.items.length === 0) {
+      return sendResponse({ res, statusCode: 400, success: false, message: 'Order must have at least one item' });
+    }
+
+    // Validate items (similar to createOrder)
+    for (let i = 0; i < orderData.items.length; i++) {
+      const item = orderData.items[i];
+      if (!item.product) return sendResponse({ res, statusCode: 400, success: false, message: `Item ${i + 1}: Product ID required` });
+      if (!mongoose.Types.ObjectId.isValid(item.product)) return sendResponse({ res, statusCode: 400, success: false, message: `Item ${i + 1}: Invalid product ID format` });
+      if (!item.name || !item.price || !item.quantity || !item.subtotal) return sendResponse({ res, statusCode: 400, success: false, message: `Item ${i + 1}: Missing fields` });
+      if (typeof item.price !== 'number' || item.price <= 0) return sendResponse({ res, statusCode: 400, success: false, message: `Item ${i + 1}: Invalid price` });
+      if (typeof item.quantity !== 'number' || item.quantity <= 0 || !Number.isInteger(item.quantity)) return sendResponse({ res, statusCode: 400, success: false, message: `Item ${i + 1}: Invalid quantity` });
+      
+      const expectedSubtotal = item.price * item.quantity;
+      if (Math.abs(item.subtotal - expectedSubtotal) > 0.01) return sendResponse({ res, statusCode: 400, success: false, message: `Item ${i + 1}: Subtotal mismatch` });
+
+      try {
+        const product = await Product.findById(item.product);
+        if (!product) return sendResponse({ res, statusCode: 400, success: false, message: `Item ${i + 1}: Product not found` });
+        if (!product.isActive || product.status !== 'published') return sendResponse({ res, statusCode: 400, success: false, message: `Item ${i + 1}: Product unavailable` });
+        if (product.isForceOutOfStock) return sendResponse({ res, statusCode: 400, success: false, message: `Item ${i + 1}: Product out of stock` });
+        
+        let actualPrice = null;
+        if (item.variantSku && product.variants && product.variants.length > 0) {
+          const variant = product.variants.find(v => v.sku === item.variantSku);
+          if (!variant) return sendResponse({ res, statusCode: 400, success: false, message: `Item ${i + 1}: Variant not found` });
+          if (!variant.isActive) return sendResponse({ res, statusCode: 400, success: false, message: `Item ${i + 1}: Variant inactive` });
+          actualPrice = variant.currentPrice;
+        } else {
+          actualPrice = product.basePrice;
+        }
+        if (actualPrice === null) return sendResponse({ res, statusCode: 400, success: false, message: `Item ${i + 1}: Invalid price` });
+        if (Math.abs(item.price - actualPrice) > 0.01) return sendResponse({ res, statusCode: 400, success: false, message: `Item ${i + 1}: Price mismatch` });
+      } catch (err) {
+        return sendResponse({ res, statusCode: 400, success: false, message: `Item ${i + 1}: Validation error` });
+      }
+    }
+
+    // Validate address if provided
+    if (orderData.shippingAddress) {
+      if (orderData.shippingAddress.divisionId) {
+        const div = await Division.findOne({ id: orderData.shippingAddress.divisionId });
+        if (!div) return sendResponse({ res, statusCode: 400, success: false, message: 'Invalid division' });
+      }
+      if (orderData.shippingAddress.districtId) {
+        const dist = await District.findOne({ id: orderData.shippingAddress.districtId });
+        if (!dist) return sendResponse({ res, statusCode: 400, success: false, message: 'Invalid district' });
+      }
+      if (orderData.shippingAddress.upazilaId) {
+        const upz = await Upazila.findOne({ id: orderData.shippingAddress.upazilaId });
+        if (!upz) return sendResponse({ res, statusCode: 400, success: false, message: 'Invalid upazila' });
+      }
+      if (orderData.shippingAddress.areaId) {
+        const area = await DhakaCity.findById(orderData.shippingAddress.areaId);
+        if (!area) return sendResponse({ res, statusCode: 400, success: false, message: 'Invalid area' });
+      }
+    }
+
+    // Calculate subtotal
+    const subtotal = orderData.items.reduce((sum, item) => sum + item.subtotal, 0);
+
+    // Remove coupons and loyalty points since total has changed
+    if (order.coupon) {
+      try {
+        await Coupon.findOneAndUpdate({ code: order.coupon }, { $inc: { usedCount: -1 } });
+      } catch (err) {}
+    }
+    
+    // Reset discounts
+    const coupon = null;
+    const couponDiscount = 0;
+    const discount = 0;
+    const upsellDiscount = 0;
+    const loyaltyDiscount = 0;
+    const loyaltyPointsUsed = 0;
+    
+    let shippingCost = order.shippingCost;
+    if (orderData.shippingCost !== undefined) {
+      shippingCost = Number(orderData.shippingCost) || 0;
+    }
+
+    const total = subtotal + shippingCost - discount - upsellDiscount - loyaltyDiscount - couponDiscount;
+
+    // Update order
+    order.items = orderData.items;
+    if (orderData.shippingAddress) {
+        order.shippingAddress = orderData.shippingAddress;
+    }
+    order.total = total;
+    order.shippingCost = shippingCost;
+    order.coupon = coupon;
+    order.couponDiscount = couponDiscount;
+    order.discount = discount;
+    order.upsellDiscount = upsellDiscount;
+    order.loyaltyDiscount = loyaltyDiscount;
+    order.loyaltyPointsUsed = loyaltyPointsUsed;
+    
+    await order.save();
+
+    return sendResponse({
+      res,
+      statusCode: 200,
+      success: true,
+      message: 'Order updated successfully',
+      data: order
+    });
+
+  } catch (error) {
+    console.error('Error in updateOrderByUser:', error);
+    return sendResponse({ res, statusCode: 500, success: false, message: 'Internal server error' });
   }
 };
 

@@ -10,6 +10,7 @@ router.get('/homepage', categoryController.getHomepageCategories);
 router.get('/featured', categoryController.getFeaturedCategories);
 router.get('/megamenu', categoryController.getCategoriesForMegamenu);
 router.get('/header', categoryController.getHeaderCategories);
+router.get('/slug/:slug', categoryController.getCategoryBySlug);
 router.get('/:id', categoryController.getCategoryById);
 router.put('/reorder', categoryController.reorderCategories);
 router.put('/:id', categoryController.updateCategory);

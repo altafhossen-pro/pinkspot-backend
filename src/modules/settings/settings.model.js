@@ -156,14 +156,22 @@ const settingsSchema = new mongoose.Schema({
       tailwindClasses: { type: String, default: '' }
     },
     topHeroBanner: {
-      type: { type: String, enum: ['image', 'video'], default: 'image' },
+      type: { type: String, enum: ['single', 'slider'], default: 'single' },
       image: { type: String, default: '' },
-      videoUrl: { type: String, default: '' },
-      title: { type: String, default: '' },
-      subtitle: { type: String, default: '' },
-      buttonText: { type: String, default: '' },
       link: { type: String, default: '' },
+      slides: [{
+        image: { type: String, default: '' },
+        link: { type: String, default: '' }
+      }],
       isActive: { type: Boolean, default: true }
+    },
+    heroOffers: {
+      isActive: { type: Boolean, default: true },
+      gridColumns: { type: Number, default: 3 },
+      offers: [{
+        image: { type: String, default: '' },
+        link: { type: String, default: '' }
+      }]
     },
     storeFeatures: {
       backgroundColor: { type: String, default: '#FF1493' },

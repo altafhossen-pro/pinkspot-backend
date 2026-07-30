@@ -22,6 +22,7 @@ router.get('/search-by-phone/:phoneNumber', verifyToken, verifyTokenAdmin, order
 router.get('/get-customer-info/:phoneNumber', orderController.getCustomerInfoByPhone);
 router.get('/:id', orderController.getOrderById);
 router.patch('/:id', orderController.updateOrder);
+router.put('/:id/user-update', verifyToken, orderController.updateOrderByUser);
 router.put('/:id/comprehensive', verifyToken, verifyTokenAdmin, orderController.updateOrderComprehensive);
 router.delete('/:id', verifyToken, verifyTokenAdmin, checkPermission('order', 'delete'), orderController.deleteOrder);
 router.post('/update-total-sold', orderController.updateTotalSold);
