@@ -156,7 +156,7 @@ const settingsSchema = new mongoose.Schema({
       tailwindClasses: { type: String, default: '' }
     },
     topHeroBanner: {
-      type: { type: String, enum: ['single', 'slider'], default: 'single' },
+      type: { type: String, enum: ['single', 'slider', 'image'], default: 'single' },
       image: { type: String, default: '' },
       link: { type: String, default: '' },
       slides: [{
