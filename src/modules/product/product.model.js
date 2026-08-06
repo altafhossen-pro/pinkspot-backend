@@ -101,6 +101,7 @@ const productSchema = new mongoose.Schema({
     enum: ['simple', 'variable', 'grouped', 'digital'],
     default: 'simple',
   },
+  excludeFromCategoryDiscount: { type: Boolean, default: false },
   // Jewelry specific properties
   isBracelet: { type: Boolean, default: false },
   isRing: { type: Boolean, default: false },

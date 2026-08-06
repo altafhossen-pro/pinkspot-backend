@@ -2,6 +2,7 @@ const app = require('./src/app');
 const dotenv = require('dotenv');
 const http = require('http');
 const socketConfig = require('./src/socket');
+const { setupSocketHandlers } = require('./src/socket.handlers');
 
 dotenv.config();
 
@@ -12,12 +13,8 @@ const server = http.createServer(app);
 // Initialize Socket.io
 const io = socketConfig.init(server);
 
-io.on('connection', (socket) => {
-    console.log('Client connected to socket.io');
-    socket.on('disconnect', () => {
-        console.log('Client disconnected from socket.io');
-    });
-});
+// Setup Socket.io event handlers (e.g., Visitor tracking)
+setupSocketHandlers(io);
 
 server.listen(PORT, () => {
     console.log(`🚀 Server running on port ${PORT}`);

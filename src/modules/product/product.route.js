@@ -26,6 +26,7 @@ router.get('/:id', productController.getProductById);
 // Admin routes with permission checks
 // Note: Specific routes (like /admin/list) should come before dynamic routes (like /admin/:id)
 router.get('/admin/list', verifyTokenAdmin, checkPermission('product', 'read'), productController.getAdminProducts);
+router.patch('/admin/bulk-exclude-category-discount', verifyTokenAdmin, checkPermission('product', 'update'), productController.bulkExcludeCategoryDiscount);
 router.get('/admin/:id', verifyTokenAdmin, checkPermission('product', 'read'), productController.getAdminProductById);
 router.post('/', verifyTokenAdmin, checkPermission('product', 'create'), productController.createProduct);
 router.patch('/:id', verifyTokenAdmin, checkPermission('product', 'update'), productController.updateProduct);

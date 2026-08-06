@@ -115,8 +115,8 @@ exports.createOrder = async (req, res) => {
       const item = orderData.items[i];
 
       try {
-        // Fetch product from database
-        const product = await Product.findById(item.product);
+        // Fetch product from database and populate category for discount checks
+        const product = await Product.findById(item.product).populate('category');
 
         if (!product) {
           return sendResponse({

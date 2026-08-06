@@ -16,6 +16,10 @@ const categorySchema = new mongoose.Schema({
     url: { type: String, default: '' },
     isActive: { type: Boolean, default: false }
   },
+  categoryDiscount: {
+    percentage: { type: Number, default: 0 },
+    isActive: { type: Boolean, default: false }
+  },
 }, {
   timestamps: true,
   toJSON: { virtuals: true },

@@ -4,6 +4,7 @@ const { Product } = require('../../product/product.model');
 const { Category } = require('../../category/category.model');
 const Coupon = require('../../coupon/coupon.model');
 const Settings = require('../../settings/settings.model');
+const { DailyStats } = require('../../analytics/analytics.model');
 const sendResponse = require('../../../utils/sendResponse');
 
 // Get comprehensive dashboard statistics
@@ -381,6 +382,17 @@ exports.getDashboardStats = async (req, res) => {
       { $sort: { '_id.year': 1, '_id.month': 1 } }
     ]);
 
+    // Visitor stats
+    const todayStr = now.toLocaleDateString('en-CA');
+    const yesterdayDate = new Date(now);
+    yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+    const yesterdayStr = yesterdayDate.toLocaleDateString('en-CA');
+
+    const [todayVisitorDoc, yesterdayVisitorDoc] = await Promise.all([
+      DailyStats.findOne({ date: todayStr }),
+      DailyStats.findOne({ date: yesterdayStr })
+    ]);
+
     return sendResponse({
       res,
       statusCode: 200,
@@ -428,6 +440,10 @@ exports.getDashboardStats = async (req, res) => {
         customers: {
           total: totalUsers,
           growth: customerGrowth
+        },
+        visitors: {
+          today: todayVisitorDoc?.totalVisitors || 0,
+          yesterday: yesterdayVisitorDoc?.totalVisitors || 0
         },
         recentOrders
       }

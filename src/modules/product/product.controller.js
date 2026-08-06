@@ -1227,3 +1227,49 @@ exports.getSimilarProducts = async (req, res) => {
     });
   }
 };
+
+// Admin: Bulk update category discount exclusion
+exports.bulkExcludeCategoryDiscount = async (req, res) => {
+  try {
+    const { categoryId, excludedProductIds, includedProductIds } = req.body;
+
+    if (!categoryId) {
+      return sendResponse({
+        res,
+        statusCode: 400,
+        success: false,
+        message: 'Category ID is required',
+      });
+    }
+
+    // Update excluded products
+    if (excludedProductIds && excludedProductIds.length > 0) {
+      await Product.updateMany(
+        { _id: { $in: excludedProductIds } },
+        { $set: { excludeFromCategoryDiscount: true } }
+      );
+    }
+
+    // Update included products
+    if (includedProductIds && includedProductIds.length > 0) {
+      await Product.updateMany(
+        { _id: { $in: includedProductIds } },
+        { $set: { excludeFromCategoryDiscount: false } }
+      );
+    }
+
+    return sendResponse({
+      res,
+      statusCode: 200,
+      success: true,
+      message: 'Product exclusions updated successfully',
+    });
+  } catch (error) {
+    return sendResponse({
+      res,
+      statusCode: 500,
+      success: false,
+      message: error.message || 'Server error',
+    });
+  }
+};
