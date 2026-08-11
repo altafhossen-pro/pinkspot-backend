@@ -1272,4 +1272,92 @@ exports.bulkExcludeCategoryDiscount = async (req, res) => {
       message: error.message || 'Server error',
     });
   }
-};
+};
+exports.getNextSkuForCategory = async (req, res) => {
+  try {
+    const { categoryId } = req.params;
+
+    if (!categoryId) {
+      return sendResponse({
+        res,
+        statusCode: 400,
+        success: false,
+        message: 'Category ID is required',
+      });
+    }
+
+    const category = await Category.findById(categoryId);
+    if (!category || !category.skuSettings || !category.skuSettings.isActive) {
+      return sendResponse({
+        res,
+        statusCode: 200,
+        success: true,
+        message: 'No active SKU settings for this category',
+        data: null
+      });
+    }
+
+    const { prefix, digitsLength } = category.skuSettings;
+    
+    // Default prefix if not set
+    const searchPrefix = prefix || '';
+
+    // Find all products in this category that match the prefix
+    const query = { category: categoryId };
+    if (searchPrefix) {
+      // Find products where any variant SKU starts with prefix
+      query['variants.sku'] = { $regex: '^' + searchPrefix, $options: 'i' };
+    }
+
+    // Sort by createdAt descending to find the latest added product, or by sku descending
+    // Sorting by SKU descending works if they have the same length. 
+    // Let's get all matching and find the max numerically.
+    const products = await Product.find(query).select('variants.sku');
+
+    let maxNumber = 0;
+    
+    for (const product of products) {
+      if (product.variants && product.variants.length > 0) {
+        for (const variant of product.variants) {
+          if (variant.sku && variant.sku.toUpperCase().startsWith(searchPrefix.toUpperCase())) {
+            // Remove prefix to get the numeric part
+            const numericPart = variant.sku.substring(searchPrefix.length);
+            const num = parseInt(numericPart, 10);
+            if (!isNaN(num) && num > maxNumber) {
+              maxNumber = num;
+            }
+          }
+        }
+      }
+    }
+
+    // Increment
+    const nextNumber = maxNumber + 1;
+    
+    // Pad with zeros
+    const paddedNumber = String(nextNumber).padStart(digitsLength || 5, '0');
+    const nextSku = searchPrefix + paddedNumber;
+
+    return sendResponse({
+      res,
+      statusCode: 200,
+      success: true,
+      message: 'Next SKU generated successfully',
+      data: {
+        sku: nextSku,
+        previousMax: maxNumber
+      }
+    });
+
+  } catch (error) {
+    console.error('Error getting next SKU:', error);
+    return sendResponse({
+      res,
+      statusCode: 500,
+      success: false,
+      message: 'Failed to generate next SKU',
+      error: error.message
+    });
+  }
+};
+

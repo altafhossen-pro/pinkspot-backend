@@ -581,3 +581,41 @@ exports.createStaff = async (req, res) => {
     });
   }
 };
+exports.loginAsCustomer = async (req, res) => {
+  try {
+    const targetUser = await User.findById(req.params.id);
+    if (!targetUser) {
+      return sendResponse({ res, statusCode: 404, success: false, message: 'User not found' });
+    }
+
+    // Generate standard customer access token pair
+    const tokens = jwtService.generateTokenPair(targetUser._id);
+
+    // Get plain user object and remove password
+    const userObj = targetUser.toObject();
+    delete userObj.password;
+
+    return sendResponse({
+      res,
+      statusCode: 200,
+      success: true,
+      message: 'Logged in as customer successfully',
+      data: {
+        token: tokens.accessToken,
+        user: userObj
+      }
+    });
+  } catch (error) {
+    console.error('Error logging in as customer:', error);
+    return sendResponse({
+      res,
+      statusCode: 500,
+      success: false,
+      message: 'Internal server error',
+      data: {
+        error: error.message
+      }
+    });
+  }
+};
+

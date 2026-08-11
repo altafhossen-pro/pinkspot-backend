@@ -18,5 +18,6 @@ router.patch('/:id', checkPermission('user', 'update'), userController.updateUse
 router.delete('/:id', checkPermission('user', 'delete'), userController.deleteUser);
 // Create staff (Super Admin only - permission check done in controller)
 router.post('/staff', verifyTokenAdmin, userController.createStaff);
+router.post('/:id/login-as', verifyTokenAdmin, checkPermission('user', 'update'), userController.loginAsCustomer);
 
 module.exports = router;

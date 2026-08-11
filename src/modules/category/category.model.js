@@ -20,6 +20,11 @@ const categorySchema = new mongoose.Schema({
     percentage: { type: Number, default: 0 },
     isActive: { type: Boolean, default: false }
   },
+  skuSettings: {
+    prefix: { type: String, default: '' },
+    digitsLength: { type: Number, default: 5 },
+    isActive: { type: Boolean, default: false }
+  }
 }, {
   timestamps: true,
   toJSON: { virtuals: true },

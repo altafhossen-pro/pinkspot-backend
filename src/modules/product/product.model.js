@@ -46,6 +46,7 @@ const productVariantSchema = new mongoose.Schema({
     width: { type: Number },
     height: { type: Number },
   },
+  sortOrder: { type: Number, default: 1 },
   images: [productImageSchema],
   isActive: { type: Boolean, default: true },
   availableFrom: { type: Date },
