@@ -24,6 +24,8 @@ router.put('/delivery-charge', verifyToken, verifyTokenAdmin, settingsController
 // Email & SMS settings endpoints
 router.get('/email-sms', settingsController.getEmailSMSSettings);
 router.put('/email-sms', verifyToken, verifyTokenAdmin, settingsController.updateEmailSMSSettings);
+router.post('/email-sms/test', verifyToken, verifyTokenAdmin, settingsController.testEmailConfig);
+router.post('/sms/test', verifyToken, verifyTokenAdmin, settingsController.testSmsConfig);
 
 // Affiliate settings endpoints
 router.get('/affiliate', settingsController.getAffiliateSettings);
@@ -36,5 +38,10 @@ router.put('/steadfast', verifyToken, verifyTokenAdmin, settingsController.updat
 // Site settings endpoints
 router.get('/site-settings', settingsController.getSiteSettings);
 router.put('/site-settings', verifyToken, verifyTokenAdmin, settingsController.updateSiteSettings);
+
+// Telegram settings endpoints
+router.get('/telegram', verifyToken, verifyTokenAdmin, settingsController.getTelegramSettings);
+router.put('/telegram', verifyToken, verifyTokenAdmin, settingsController.updateTelegramSettings);
+router.post('/telegram/test', verifyToken, verifyTokenAdmin, settingsController.testTelegramConfig);
 
 module.exports = router;

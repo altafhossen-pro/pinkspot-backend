@@ -6,6 +6,7 @@ const { uploadSingle, handleUploadError, generateFileUrl, deleteFile } = require
 const { Loyalty } = require('../loyalty/loyalty.model');
 const Settings = require('../settings/settings.model');
 const { sendWelcomeEmail } = require('../../utils/email');
+const { sendTelegramNotification } = require('../../utils/telegram');
 
 exports.signup = async (req, res) => {
   try {
@@ -76,6 +77,13 @@ exports.signup = async (req, res) => {
     // Remove password from response
     const userObj = user.toObject();
     delete userObj.password;
+
+    // Trigger Telegram Notification
+    sendTelegramNotification('NEW_USER_SIGNUP', {
+      name: userObj.name,
+      identifier: userObj.email,
+      method: 'Email (Standard)'
+    }).catch(err => console.error(err));
 
     // Send response first (don't wait for email)
     sendResponse({
@@ -400,6 +408,11 @@ exports.changePassword = async (req, res) => {
     // Update password
     user.password = hashedNewPassword;
     await user.save();
+
+    // Trigger Telegram Notification
+    sendTelegramNotification('PASSWORD_CHANGE', {
+      identifier: user.email || user.phone || 'User ID: ' + userId
+    }).catch(err => console.error(err));
 
     return sendResponse({
       res,

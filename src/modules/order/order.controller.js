@@ -16,6 +16,38 @@ const { AffiliateTracking } = require('../affiliate/affiliateTracking.model');
 const steadfastService = require('../steadfast/steadfast.service');
 const mongoose = require('mongoose');
 const socketConfig = require('../../socket');
+const { sendTelegramNotification } = require('../../utils/telegram');
+
+const Blocklist = require('../blocklist/blocklist.model');
+
+const checkIsBlocked = async (ip, phone) => {
+  const query = [];
+  if (ip) query.push({ type: 'ip', value: ip });
+  if (phone) {
+    if (Array.isArray(phone)) {
+      phone.forEach(p => { if (p) query.push({ type: 'phone', value: p }) });
+    } else {
+      query.push({ type: 'phone', value: phone });
+    }
+  }
+  
+  if (query.length === 0) return false;
+
+  const blocks = await Blocklist.find({
+    $and: [
+      { $or: query },
+      {
+        $or: [
+          { expiresAt: null },
+          { expiresAt: { $gt: new Date() } },
+          { expiresAt: { $exists: false } }
+        ]
+      }
+    ]
+  });
+
+  return blocks.length > 0 ? blocks[0] : null;
+};
 
 exports.createOrder = async (req, res) => {
   try {
@@ -26,6 +58,30 @@ exports.createOrder = async (req, res) => {
     // Set user from authenticated token
     orderData.user = req.user._id;
     orderData.isGuestOrder = false;
+
+    // Capture IP Address
+    const clientIp = req.headers['x-forwarded-for']?.split(',')[0] || req.socket?.remoteAddress || req.ip;
+    const ipAddress = clientIp ? clientIp.toString().trim() : undefined;
+    orderData.ipAddress = ipAddress;
+
+    // Check if user IP or phone is blocked
+    const userPhone = req.user.phone || req.user.phoneNumber;
+    const shippingPhone = orderData.shippingAddress?.phone;
+    
+    // Check both account phone and shipping phone
+    const phonesToCheck = [];
+    if (userPhone) phonesToCheck.push(userPhone);
+    if (shippingPhone && shippingPhone !== userPhone) phonesToCheck.push(shippingPhone);
+
+    const blockRecord = await checkIsBlocked(ipAddress, phonesToCheck);
+    if (blockRecord) {
+      return sendResponse({
+        res,
+        statusCode: 403,
+        success: false,
+        message: blockRecord.responseMsg || 'Your IP address or phone number has been blocked from placing orders.'
+      });
+    }
 
     // Validate order items and product IDs
     if (!orderData.items || !Array.isArray(orderData.items) || orderData.items.length === 0) {
@@ -641,6 +697,27 @@ exports.createOrder = async (req, res) => {
       }
     } catch (socketErr) {
       console.error('Socket notification error:', socketErr);
+    }
+
+    // Trigger Telegram Notification
+    try {
+      const isGuest = order.isGuestOrder;
+      const customerName = order.user ? (order.user.name || 'User') : (order.guestInfo?.name || 'Guest');
+      const payload = {
+        orderId: order.orderId,
+        totalAmount: order.total,
+        customerName: customerName,
+        items: order.items ? order.items.map(item => ({
+          productTitle: item.name || 'Product',
+          quantity: item.quantity
+        })) : []
+      };
+      
+      const msgType = isGuest ? 'NEW_ORDER_GUEST' : 'NEW_ORDER_EXISTING';
+      // don't await so we don't block the response
+      sendTelegramNotification(msgType, payload).catch(err => console.error(err));
+    } catch (telegramErr) {
+      console.error('Telegram notification error for new order:', telegramErr);
     }
 
     return sendResponse({
@@ -2306,6 +2383,23 @@ exports.createGuestOrder = async (req, res) => {
     orderData.user = null;
     orderData.isGuestOrder = true;
 
+    // Capture IP Address
+    const clientIp = req.headers['x-forwarded-for']?.split(',')[0] || req.socket?.remoteAddress || req.ip;
+    const ipAddress = clientIp ? clientIp.toString().trim() : undefined;
+    orderData.ipAddress = ipAddress;
+
+    // Check if IP or guest phone is blocked
+    const blockCheckPhone = orderData.guestInfo?.phone || (orderData.shippingAddress && orderData.shippingAddress.phone);
+    const blockRecord = await checkIsBlocked(ipAddress, blockCheckPhone);
+    if (blockRecord) {
+      return sendResponse({
+        res,
+        statusCode: 403,
+        success: false,
+        message: blockRecord.responseMsg || 'Your IP address or phone number has been blocked from placing orders.'
+      });
+    }
+
     // Validate address IDs if provided
     if (orderData.shippingAddress) {
       // Validate division ID if provided
@@ -2650,6 +2744,24 @@ exports.createManualOrder = async (req, res) => {
       });
     }
 
+    // Capture IP Address
+    const clientIp = req.headers['x-forwarded-for']?.split(',')[0] || req.socket?.remoteAddress || req.ip;
+    const ipAddress = clientIp ? clientIp.toString().trim() : undefined;
+
+    // Optional: Check if the provided phone is blocked even for manual orders
+    const targetPhone = guestInfo?.phone || null;
+    
+    // We only check targetPhone for manual orders, typically we don't block admin IP
+    const blockRecord = await checkIsBlocked(null, targetPhone);
+    if (blockRecord) {
+      return sendResponse({
+        res,
+        statusCode: 403,
+        success: false,
+        message: blockRecord.responseMsg || 'This phone number has been blocked from placing orders.'
+      });
+    }
+
     // Prepare order data
     const orderData = {
       orderType: 'manual',
@@ -2669,6 +2781,7 @@ exports.createManualOrder = async (req, res) => {
       orderNotes: notes || '',
       orderSource: orderSource || 'manual', // Set order source from request or default to 'manual'
       createdBy: req.user._id, // Admin who created the order
+      ipAddress: clientIp ? clientIp.toString().trim() : undefined,
       statusTimestamps: {
         pending: new Date(),
         confirmed: new Date()

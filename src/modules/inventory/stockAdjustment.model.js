@@ -73,7 +73,7 @@ const stockAdjustmentSchema = new mongoose.Schema({
 });
 
 // Indexes
-stockAdjustmentSchema.index({ adjustmentNumber: 1 });
+
 stockAdjustmentSchema.index({ performedBy: 1, createdAt: -1 });
 stockAdjustmentSchema.index({ createdAt: -1 });
 

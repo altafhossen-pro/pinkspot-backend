@@ -115,6 +115,7 @@ const orderSchema = new mongoose.Schema({
     },
     isGuestOrder: { type: Boolean, default: false }, // To distinguish guest orders
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, // For manual orders
+    ipAddress: { type: String }, // To track IP address of the order
     // Guest order customer information (for checkout guest orders)
     guestInfo: {
         name: { type: String },
@@ -159,7 +160,7 @@ const orderSchema = new mongoose.Schema({
     timestamps: true,
 });
 
-orderSchema.index({ user: 1 });
+
 orderSchema.index({ status: 1 });
 orderSchema.index({ createdAt: -1 });
 orderSchema.index({ isGuestOrder: 1 });

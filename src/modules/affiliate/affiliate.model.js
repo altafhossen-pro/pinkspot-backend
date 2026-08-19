@@ -61,8 +61,7 @@ const affiliateSchema = new mongoose.Schema({
 });
 
 // Index for faster lookups
-affiliateSchema.index({ affiliateCode: 1 });
-affiliateSchema.index({ user: 1 });
+
 
 // Generate unique affiliate code before saving
 affiliateSchema.pre('save', async function (next) {

@@ -53,7 +53,7 @@ otpSchema.pre('save', function(next) {
 // Index for efficient queries
 otpSchema.index({ phone: 1, isUsed: 1 });
 otpSchema.index({ email: 1, isUsed: 1 });
-otpSchema.index({ expiresAt: 1 });
+
 
 const OTP = mongoose.model('OTP', otpSchema);
 

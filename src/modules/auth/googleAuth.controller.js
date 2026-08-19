@@ -5,8 +5,10 @@ const axios = require('axios');
 const bcrypt = require('bcryptjs');
 const querystring = require('querystring');
 const { Loyalty } = require('../loyalty/loyalty.model');
+
 const Settings = require('../settings/settings.model');
 const { sendWelcomeEmail } = require('../../utils/email');
+const { sendTelegramNotification } = require('../../utils/telegram');
 require('dotenv').config(); // Ensure dotenv is loaded
 
 // Google OAuth credentials - Must be set in environment variables
@@ -219,6 +221,13 @@ exports.googleCallback = async (req, res) => {
         console.error('Failed to send welcome email:', emailError);
         // Don't fail Google auth if email fails
       });
+      
+      // Trigger Telegram Notification
+      sendTelegramNotification('NEW_USER_SIGNUP', {
+        name: user.name,
+        identifier: user.email,
+        method: 'Google OAuth (Web)'
+      }).catch(err => console.error(err));
     }
 
     return res.redirect(redirectUrl);
@@ -355,6 +364,13 @@ exports.googleMobileAuth = async (req, res) => {
       sendWelcomeEmail(user, signupBonusCoins).catch(emailError => {
         console.error('Failed to send welcome email:', emailError);
       });
+
+      // Trigger Telegram Notification
+      sendTelegramNotification('NEW_USER_SIGNUP', {
+        name: user.name,
+        identifier: user.email,
+        method: 'Google OAuth (Mobile)'
+      }).catch(err => console.error(err));
     }
 
     return sendResponse({

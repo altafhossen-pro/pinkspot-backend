@@ -93,6 +93,31 @@ const getPaginatedProducts = async (filter, req, res, message) => {
 
 exports.createProduct = async (req, res) => {
   try {
+    // Custom Validation
+    const { title, category, slug, variants } = req.body;
+    const errors = [];
+    if (!title) errors.push("Title is required");
+    if (!category) errors.push("Category is required");
+    if (!slug) errors.push("Slug is required");
+    
+    if (variants && Array.isArray(variants)) {
+      variants.forEach((v, idx) => {
+        if (!v.sku) errors.push(`SKU is required for variant ${idx + 1}`);
+        if (v.currentPrice === undefined || v.currentPrice === null || v.currentPrice === '') {
+          errors.push(`Current price is required for variant ${idx + 1}`);
+        }
+      });
+    }
+
+    if (errors.length > 0) {
+      return sendResponse({
+        res,
+        statusCode: 400,
+        success: false,
+        message: errors.join(', '),
+      });
+    }
+
     // Sanitize slug to remove leading/trailing hyphens
     if (req.body.slug) {
       req.body.slug = sanitizeSlug(req.body.slug);

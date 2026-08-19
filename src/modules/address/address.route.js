@@ -29,8 +29,17 @@ router.put('/admin/divisions/:id', checkPermission('settings', 'write'), address
 router.put('/admin/districts/:id', checkPermission('settings', 'write'), addressController.adminUpdateDistrict);
 router.put('/admin/upazilas/:id', checkPermission('settings', 'write'), addressController.adminUpdateUpazila);
 router.put('/admin/dhaka-city/:id', checkPermission('settings', 'write'), addressController.adminUpdateDhakaCityArea);
+router.post('/admin/dhaka-city', checkPermission('settings', 'write'), addressController.adminCreateDhakaCityArea);
 
 // Admin: Delete (require write permission) - Only for Dhaka City
 router.delete('/admin/dhaka-city/:id', checkPermission('settings', 'write'), addressController.adminDeleteDhakaCityArea);
+
+// Admin: Data Management routes
+router.delete('/admin/all', checkPermission('settings', 'write'), addressController.deleteAllAddressData);
+router.delete('/admin/divisions/all', checkPermission('settings', 'write'), addressController.deleteAllDivisions);
+router.delete('/admin/districts/all', checkPermission('settings', 'write'), addressController.deleteAllDistricts);
+router.delete('/admin/upazilas/all', checkPermission('settings', 'write'), addressController.deleteAllUpazilas);
+router.delete('/admin/dhaka-cities/all', checkPermission('settings', 'write'), addressController.deleteAllDhakaCities);
+router.post('/admin/seed', checkPermission('settings', 'write'), addressController.seedAddressData);
 
 module.exports = router;

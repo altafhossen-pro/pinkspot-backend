@@ -137,6 +137,42 @@ const settingsSchema = new mongoose.Schema({
     }
   },
 
+  // Telegram Settings
+  telegramSettings: {
+    botToken: {
+      type: String,
+      default: ''
+    },
+    chatId: {
+      type: String,
+      default: ''
+    },
+    enableSuccessMsgOnSteadfastCallback: {
+      type: Boolean,
+      default: false
+    },
+    enableDebugLogOnSteadfastCallback: {
+      type: Boolean,
+      default: false
+    },
+    notifyNewOrderExistingUser: {
+      type: Boolean,
+      default: false
+    },
+    notifyNewOrderGuestUser: {
+      type: Boolean,
+      default: false
+    },
+    notifyNewUserSignup: {
+      type: Boolean,
+      default: false
+    },
+    notifyPasswordChange: {
+      type: Boolean,
+      default: false
+    }
+  },
+
   // Admin who last updated
   updatedBy: {
     type: mongoose.Schema.Types.ObjectId,

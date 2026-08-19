@@ -1,6 +1,7 @@
 
 const sendResponse = require('../../utils/sendResponse');
 const Settings = require('./settings.model');
+const EmailSmsSettings = require('./emailSmsSettings.model');
 
 // Get current settings
 exports.getSettings = async (req, res) => {
@@ -223,11 +224,11 @@ exports.updateDeliveryChargeSettings = async (req, res) => {
 // Get email & SMS settings
 exports.getEmailSMSSettings = async (req, res) => {
   try {
-    let settings = await Settings.findOne();
+    let settings = await EmailSmsSettings.findOne();
 
     // If no settings exist, create default settings
     if (!settings) {
-      settings = new Settings();
+      settings = new EmailSmsSettings();
       await settings.save();
     }
 
@@ -236,10 +237,7 @@ exports.getEmailSMSSettings = async (req, res) => {
       statusCode: 200,
       success: true,
       message: 'Email & SMS settings retrieved successfully',
-      data: {
-        isSendOrderConfirmationEmail: settings.isSendOrderConfirmationEmail !== false,
-        isSendGuestOrderConfirmationSMS: settings.isSendGuestOrderConfirmationSMS !== false
-      }
+      data: settings
     });
   } catch (error) {
     return sendResponse({
@@ -254,23 +252,15 @@ exports.getEmailSMSSettings = async (req, res) => {
 // Update email & SMS settings
 exports.updateEmailSMSSettings = async (req, res) => {
   try {
-    const { isSendOrderConfirmationEmail, isSendGuestOrderConfirmationSMS } = req.body;
+    const emailSmsData = req.body;
 
-    let settings = await Settings.findOne();
+    let settings = await EmailSmsSettings.findOne();
 
     if (!settings) {
-      // Create new settings if none exist
-      settings = new Settings();
+      settings = new EmailSmsSettings();
     }
 
-    // Update email & SMS settings
-    if (typeof isSendOrderConfirmationEmail === 'boolean') {
-      settings.isSendOrderConfirmationEmail = isSendOrderConfirmationEmail;
-    }
-    if (typeof isSendGuestOrderConfirmationSMS === 'boolean') {
-      settings.isSendGuestOrderConfirmationSMS = isSendGuestOrderConfirmationSMS;
-    }
-
+    Object.assign(settings, emailSmsData);
     settings.updatedBy = req.user._id;
 
     await settings.save();
@@ -280,10 +270,7 @@ exports.updateEmailSMSSettings = async (req, res) => {
       statusCode: 200,
       success: true,
       message: 'Email & SMS settings updated successfully',
-      data: {
-        isSendOrderConfirmationEmail: settings.isSendOrderConfirmationEmail,
-        isSendGuestOrderConfirmationSMS: settings.isSendGuestOrderConfirmationSMS
-      }
+      data: settings
     });
   } catch (error) {
     return sendResponse({
@@ -291,6 +278,153 @@ exports.updateEmailSMSSettings = async (req, res) => {
       statusCode: 500,
       success: false,
       message: error.message || 'Server error'
+    });
+  }
+};
+
+// Test email configuration
+exports.testEmailConfig = async (req, res) => {
+  try {
+    const emailConfig = req.body;
+    
+    // Create a temporary transporter with the provided config to test it
+    const nodemailer = require('nodemailer');
+    const host = emailConfig.smtpHost || process.env.SMTP_HOST || 'smtp.gmail.com';
+    const port = emailConfig.smtpPort || parseInt(process.env.SMTP_PORT) || 587;
+    const user = emailConfig.smtpUser || process.env.SMTP_EMAIL;
+    const pass = emailConfig.smtpPass || process.env.SMTP_PASSWORD;
+    const fromEmail = emailConfig.emailFrom || process.env.EMAIL_FROM || process.env.SMTP_EMAIL;
+    const fromName = emailConfig.emailFromName || process.env.EMAIL_FROM_NAME || 'Pinkspot';
+
+    if (!user || !pass) {
+      return sendResponse({
+        res,
+        statusCode: 400,
+        success: false,
+        message: 'SMTP User and Password are required for testing'
+      });
+    }
+
+    const transporter = nodemailer.createTransport({
+      host,
+      port,
+      secure: false, // true for 465, false for 587
+      auth: {
+        user,
+        pass
+      },
+      tls: {
+        rejectUnauthorized: false
+      }
+    });
+
+    const testEmailAddress = emailConfig.testEmailAddress; // Send to provided email
+
+    if (!testEmailAddress) {
+      return sendResponse({
+        res,
+        statusCode: 400,
+        success: false,
+        message: 'Please provide an email address to send the test email to.'
+      });
+    }
+
+    const mailOptions = {
+      from: `"${fromName} (Test)" <${fromEmail}>`,
+      to: testEmailAddress,
+      subject: 'Pinkspot - Test Email Configuration',
+      html: `
+        <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
+          <h2 style="color: #ec4899;">Email Configuration Test Successful! 🎉</h2>
+          <p>Hello Admin,</p>
+          <p>If you are receiving this email, it means your SMTP configuration is working perfectly.</p>
+          <br/>
+          <p><strong>Config Details Used:</strong></p>
+          <ul>
+            <li>Host: ${host}</li>
+            <li>Port: ${port}</li>
+            <li>From Email: ${fromEmail}</li>
+          </ul>
+        </div>
+      `
+    };
+
+    await transporter.sendMail(mailOptions);
+
+    return sendResponse({
+      res,
+      statusCode: 200,
+      success: true,
+      message: 'Test email sent successfully! Please check your inbox.'
+    });
+
+  } catch (error) {
+    console.error('Test email error:', error);
+    return sendResponse({
+      res,
+      statusCode: 500,
+      success: false,
+      message: 'Failed to send test email: ' + error.message
+    });
+  }
+};
+
+// Test SMS configuration
+exports.testSmsConfig = async (req, res) => {
+  try {
+    const smsConfig = req.body;
+    const testPhoneNumber = smsConfig.testPhoneNumber;
+
+    if (!testPhoneNumber) {
+      return sendResponse({
+        res,
+        statusCode: 400,
+        success: false,
+        message: 'Please provide a phone number to send the test SMS to.'
+      });
+    }
+
+    const apiKey = smsConfig.smsApiKey || process.env.BULKSMSBD_API_KEY;
+    const senderId = smsConfig.smsSenderId || process.env.BULKSMSBD_SENDER_ID;
+
+    if (!apiKey || !senderId) {
+      return sendResponse({
+        res,
+        statusCode: 400,
+        success: false,
+        message: 'SMS API Key and Sender ID are required for testing.'
+      });
+    }
+
+    const axios = require('axios');
+    const message = 'Pinkspot - Your SMS configuration is working perfectly! 🎉';
+    const apiUrl = `https://bulksmsbd.net/api/smsapi?api_key=${apiKey}&type=text&number=${testPhoneNumber}&senderid=${senderId}&message=${encodeURIComponent(message)}`;
+
+    const response = await axios.get(apiUrl);
+
+    if (response.data && response.data.response_code === 202) {
+      return sendResponse({
+        res,
+        statusCode: 200,
+        success: true,
+        message: 'Test SMS sent successfully! Please check your phone.'
+      });
+    } else {
+      return sendResponse({
+        res,
+        statusCode: 400,
+        success: false,
+        message: 'Failed to send test SMS. API response: ' + (response.data.error_message || 'Unknown error')
+      });
+    }
+
+  } catch (error) {
+    console.error('Test SMS error:', error);
+    return sendResponse({
+      res,
+      statusCode: 500,
+      success: false,
+      message: 'Failed to send test SMS: ' + error.message
     });
   }
 };
@@ -494,6 +628,125 @@ exports.updateSiteSettings = async (req, res) => {
       statusCode: 500,
       success: false,
       message: error.message || 'Server error'
+    });
+  }
+};
+
+// Get telegram settings
+exports.getTelegramSettings = async (req, res) => {
+  try {
+    let settings = await Settings.findOne();
+
+    if (!settings) {
+      settings = new Settings();
+      await settings.save();
+    }
+
+    return sendResponse({
+      res,
+      statusCode: 200,
+      success: true,
+      message: 'Telegram settings retrieved successfully',
+      data: settings.telegramSettings || {}
+    });
+  } catch (error) {
+    return sendResponse({
+      res,
+      statusCode: 500,
+      success: false,
+      message: error.message || 'Server error'
+    });
+  }
+};
+
+// Update telegram settings
+exports.updateTelegramSettings = async (req, res) => {
+  try {
+    const telegramData = req.body;
+
+    let settings = await Settings.findOne();
+
+    if (!settings) {
+      settings = new Settings();
+    }
+
+    if (!settings.telegramSettings) {
+      settings.telegramSettings = {};
+    }
+    Object.assign(settings.telegramSettings, telegramData);
+    settings.updatedBy = req.user._id;
+
+    await settings.save();
+
+    return sendResponse({
+      res,
+      statusCode: 200,
+      success: true,
+      message: 'Telegram settings updated successfully',
+      data: settings.telegramSettings
+    });
+  } catch (error) {
+    return sendResponse({
+      res,
+      statusCode: 500,
+      success: false,
+      message: error.message || 'Server error'
+    });
+  }
+};
+
+// Test Telegram Configuration
+exports.testTelegramConfig = async (req, res) => {
+  try {
+    const { botToken, chatId } = req.body;
+
+    if (!botToken || !chatId) {
+      return sendResponse({
+        res,
+        statusCode: 400,
+        success: false,
+        message: 'Bot Token and Chat ID are required'
+      });
+    }
+
+    const message = 'Hello! This is a test message from your Pinkspot store to confirm your Telegram configuration is working properly.';
+    const telegramUrl = `https://api.telegram.org/bot${botToken}/sendMessage`;
+    
+    // Using fetch (available in Node 18+)
+    const response = await fetch(telegramUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text: message
+      })
+    });
+
+    const data = await response.json();
+
+    if (data.ok) {
+      return sendResponse({
+        res,
+        statusCode: 200,
+        success: true,
+        message: 'Test message sent successfully!'
+      });
+    } else {
+      return sendResponse({
+        res,
+        statusCode: 400,
+        success: false,
+        message: data.description || 'Failed to send message'
+      });
+    }
+  } catch (error) {
+    return sendResponse({
+      res,
+      statusCode: 500,
+      success: false,
+      message: error.message || 'Failed to connect to Telegram API'
     });
   }
 };

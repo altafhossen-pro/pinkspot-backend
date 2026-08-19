@@ -5,7 +5,7 @@ const sendResponse = require('../../utils/sendResponse');
 exports.getDivisions = async (req, res) => {
     try {
         const divisions = await Division.find().sort({ name: 1 });
-        
+
         return sendResponse({
             res,
             statusCode: 200,
@@ -27,11 +27,11 @@ exports.getDivisions = async (req, res) => {
 exports.getDistrictsByDivision = async (req, res) => {
     try {
         const { divisionId } = req.params;
-        
-        const districts = await District.find({ 
+
+        const districts = await District.find({
             division_id: divisionId
         }).sort({ name: 1 });
-        
+
         return sendResponse({
             res,
             statusCode: 200,
@@ -53,11 +53,11 @@ exports.getDistrictsByDivision = async (req, res) => {
 exports.getUpazilasByDistrict = async (req, res) => {
     try {
         const { districtId } = req.params;
-        
-        const upazilas = await Upazila.find({ 
-            district_id: districtId, 
+
+        const upazilas = await Upazila.find({
+            district_id: districtId,
         }).sort({ name: 1 });
-        
+
         return sendResponse({
             res,
             statusCode: 200,
@@ -79,11 +79,11 @@ exports.getUpazilasByDistrict = async (req, res) => {
 exports.getDhakaCityAreas = async (req, res) => {
     try {
         const { districtId } = req.params;
-        
-        const dhakaAreas = await DhakaCity.find({ 
-            district_id: districtId, 
+
+        const dhakaAreas = await DhakaCity.find({
+            district_id: districtId,
         }).sort({ name: 1 });
-        
+
         return sendResponse({
             res,
             statusCode: 200,
@@ -106,7 +106,7 @@ exports.getAllDistricts = async (req, res) => {
     try {
         const districts = await District.find()
             .sort({ name: 1 });
-        
+
         return sendResponse({
             res,
             statusCode: 200,
@@ -129,7 +129,7 @@ exports.getAllUpazilas = async (req, res) => {
     try {
         const upazilas = await Upazila.find()
             .sort({ name: 1 });
-        
+
         return sendResponse({
             res,
             statusCode: 200,
@@ -152,7 +152,7 @@ exports.getAllDhakaCityAreas = async (req, res) => {
     try {
         const dhakaAreas = await DhakaCity.find()
             .sort({ name: 1 });
-        
+
         return sendResponse({
             res,
             statusCode: 200,
@@ -581,6 +581,59 @@ exports.adminUpdateDhakaCityArea = async (req, res) => {
     }
 };
 
+// Admin: Create Dhaka city area
+exports.adminCreateDhakaCityArea = async (req, res) => {
+    try {
+        const { name, bn_name, city_corporation, isActive } = req.body;
+
+        if (!name || !bn_name || !city_corporation) {
+            return sendResponse({
+                res,
+                statusCode: 400,
+                success: false,
+                message: 'Name, BN Name, and City Corporation are required'
+            });
+        }
+
+        // Get default division_id and district_id from an existing record
+        // By default, Dhaka is division_id: '3' and district_id: '1'
+        let division_id = '3';
+        let district_id = '65';
+
+        const existingArea = await DhakaCity.findOne();
+        if (existingArea) {
+            division_id = existingArea.division_id;
+            district_id = existingArea.district_id;
+        }
+
+        const newDhakaArea = new DhakaCity({
+            name: name.trim(),
+            bn_name: bn_name.trim(),
+            city_corporation: city_corporation.trim(),
+            division_id,
+            district_id,
+            isActive: isActive !== undefined ? isActive : true
+        });
+
+        await newDhakaArea.save();
+
+        return sendResponse({
+            res,
+            statusCode: 201,
+            success: true,
+            message: 'Dhaka city area created successfully',
+            data: newDhakaArea
+        });
+    } catch (error) {
+        return sendResponse({
+            res,
+            statusCode: 500,
+            success: false,
+            message: error.message || 'Server error'
+        });
+    }
+};
+
 // Admin: Delete Dhaka city area
 exports.adminDeleteDhakaCityArea = async (req, res) => {
     try {
@@ -610,6 +663,168 @@ exports.adminDeleteDhakaCityArea = async (req, res) => {
             statusCode: 500,
             success: false,
             message: error.message || 'Server error'
+        });
+    }
+};
+
+// Admin: Delete all address data globally
+exports.deleteAllAddressData = async (req, res) => {
+    try {
+        await Promise.all([
+            Division.deleteMany({}),
+            District.deleteMany({}),
+            Upazila.deleteMany({}),
+            DhakaCity.deleteMany({})
+        ]);
+
+        return sendResponse({
+            res,
+            statusCode: 200,
+            success: true,
+            message: 'All address data cleared successfully'
+        });
+    } catch (error) {
+        return sendResponse({
+            res,
+            statusCode: 500,
+            success: false,
+            message: error.message || 'Server error'
+        });
+    }
+};
+
+// Admin: Delete all divisions
+exports.deleteAllDivisions = async (req, res) => {
+    try {
+        await Division.deleteMany({});
+        return sendResponse({
+            res,
+            statusCode: 200,
+            success: true,
+            message: 'All divisions deleted successfully'
+        });
+    } catch (error) {
+        return sendResponse({
+            res,
+            statusCode: 500,
+            success: false,
+            message: error.message || 'Server error'
+        });
+    }
+};
+
+// Admin: Delete all districts
+exports.deleteAllDistricts = async (req, res) => {
+    try {
+        await District.deleteMany({});
+        return sendResponse({
+            res,
+            statusCode: 200,
+            success: true,
+            message: 'All districts deleted successfully'
+        });
+    } catch (error) {
+        return sendResponse({
+            res,
+            statusCode: 500,
+            success: false,
+            message: error.message || 'Server error'
+        });
+    }
+};
+
+// Admin: Delete all upazilas
+exports.deleteAllUpazilas = async (req, res) => {
+    try {
+        await Upazila.deleteMany({});
+        return sendResponse({
+            res,
+            statusCode: 200,
+            success: true,
+            message: 'All upazilas deleted successfully'
+        });
+    } catch (error) {
+        return sendResponse({
+            res,
+            statusCode: 500,
+            success: false,
+            message: error.message || 'Server error'
+        });
+    }
+};
+
+// Admin: Delete all Dhaka cities
+exports.deleteAllDhakaCities = async (req, res) => {
+    try {
+        await DhakaCity.deleteMany({});
+        return sendResponse({
+            res,
+            statusCode: 200,
+            success: true,
+            message: 'All Dhaka cities deleted successfully'
+        });
+    } catch (error) {
+        return sendResponse({
+            res,
+            statusCode: 500,
+            success: false,
+            message: error.message || 'Server error'
+        });
+    }
+};
+
+// Admin: Seed all address data from JSON
+exports.seedAddressData = async (req, res) => {
+    try {
+        const fs = require('fs');
+        const path = require('path');
+
+        // Find the absolute path to scripts/data
+        const dataDir = path.resolve(__dirname, '../../../scripts/data');
+
+        let results = [];
+
+        if (fs.existsSync(path.join(dataDir, 'divisions.json'))) {
+            const divisions = JSON.parse(fs.readFileSync(path.join(dataDir, 'divisions.json'), 'utf8'));
+            await Division.deleteMany({});
+            await Division.insertMany(divisions);
+            results.push(`${divisions.length} divisions`);
+        }
+
+        if (fs.existsSync(path.join(dataDir, 'districts.json'))) {
+            const districts = JSON.parse(fs.readFileSync(path.join(dataDir, 'districts.json'), 'utf8'));
+            await District.deleteMany({});
+            await District.insertMany(districts);
+            results.push(`${districts.length} districts`);
+        }
+
+        if (fs.existsSync(path.join(dataDir, 'upazilas.json'))) {
+            const upazilas = JSON.parse(fs.readFileSync(path.join(dataDir, 'upazilas.json'), 'utf8'));
+            await Upazila.deleteMany({});
+            await Upazila.insertMany(upazilas);
+            results.push(`${upazilas.length} upazilas`);
+        }
+
+        if (fs.existsSync(path.join(dataDir, 'dhakacities.json'))) {
+            const dhakaCities = JSON.parse(fs.readFileSync(path.join(dataDir, 'dhakacities.json'), 'utf8'));
+            await DhakaCity.deleteMany({});
+            await DhakaCity.insertMany(dhakaCities);
+            results.push(`${dhakaCities.length} Dhaka cities`);
+        }
+
+        return sendResponse({
+            res,
+            statusCode: 200,
+            success: true,
+            message: `Address data seeded successfully. Imported: ${results.join(', ')}`
+        });
+    } catch (error) {
+        console.error('Seed Error:', error);
+        return sendResponse({
+            res,
+            statusCode: 500,
+            success: false,
+            message: error.message || 'Server error during seeding'
         });
     }
 };

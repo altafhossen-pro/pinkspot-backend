@@ -74,7 +74,7 @@ const purchaseSchema = new mongoose.Schema({
 });
 
 // Indexes
-purchaseSchema.index({ purchaseNumber: 1 });
+
 purchaseSchema.index({ performedBy: 1, createdAt: -1 });
 purchaseSchema.index({ createdAt: -1 });
 

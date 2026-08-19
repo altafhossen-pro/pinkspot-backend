@@ -52,7 +52,7 @@ const roleSchema = new mongoose.Schema({
 
 // Index for faster lookups
 roleSchema.index({ isActive: 1, isSuperAdmin: 1 });
-roleSchema.index({ slug: 1 });
+
 
 // Virtual to get permission strings array
 roleSchema.virtual('permissionStrings', {

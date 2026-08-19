@@ -68,8 +68,7 @@ const affiliateTrackingSchema = new mongoose.Schema({
 // Indexes for faster queries
 affiliateTrackingSchema.index({ user: 1, createdAt: -1 });
 affiliateTrackingSchema.index({ referrer: 1, createdAt: -1 });
-affiliateTrackingSchema.index({ order: 1 });
-affiliateTrackingSchema.index({ affiliateCode: 1 });
+
 
 const AffiliateTracking = mongoose.model('AffiliateTracking', affiliateTrackingSchema);
 

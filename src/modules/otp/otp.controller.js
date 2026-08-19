@@ -4,6 +4,7 @@ const otpService = require('../../services/otpService');
 const sendResponse = require('../../utils/sendResponse');
 const jwtService = require('../../services/jwtService');
 const { sendOTPEmail, sendWelcomeEmail } = require('../../utils/email');
+const { sendTelegramNotification } = require('../../utils/telegram');
 const { Loyalty } = require('../loyalty/loyalty.model');
 const Settings = require('../settings/settings.model');
 
@@ -324,6 +325,14 @@ exports.verifyOTP = async (req, res) => {
         console.error('Failed to send welcome email:', emailError);
         // Don't fail signup if email fails
       });
+    }
+
+    if (isNewUser) {
+      sendTelegramNotification('NEW_USER_SIGNUP', {
+        name: user.name,
+        identifier: user.phone || user.email,
+        method: 'OTP (Phone)'
+      }).catch(err => console.error(err));
     }
 
   } catch (error) {
@@ -938,6 +947,12 @@ exports.verifyRegisterOTP = async (req, res) => {
         // Don't fail signup if email fails
       });
     }
+
+    sendTelegramNotification('NEW_USER_SIGNUP', {
+      name: user.name,
+      identifier: user.email,
+      method: 'OTP (Email)'
+    }).catch(err => console.error(err));
 
   } catch (error) {
     console.error('Verify Register OTP error:', error);

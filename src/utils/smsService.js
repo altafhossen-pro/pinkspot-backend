@@ -1,12 +1,12 @@
 const axios = require('axios');
+const EmailSmsSettings = require('../modules/settings/emailSmsSettings.model');
 
 /**
  * SMS Service - Reusable utility for sending SMS via Bulk SMS BD API
  */
 
 const SMS_CONFIG = {
-  apiUrl: 'http://bulksmsbd.net/api/smsapi',
-  senderId: '8809648904634', // Approved Sender ID
+  apiUrl: 'http://bulksmsbd.net/api/smsapi'
 };
 
 /**
@@ -110,10 +110,14 @@ const sendSMS = async (phone, message) => {
       };
     }
 
+    const settings = await EmailSmsSettings.findOne();
+
     // Get API key from environment
-    const apiKey = process.env.SMS_API_KEY;
+    const apiKey = settings?.smsApiKey || process.env.SMS_API_KEY;
+    const senderId = settings?.smsSenderId || '8809648904634';
+
     if (!apiKey) {
-      console.error('SMS_API_KEY is not set in environment variables');
+      console.error('SMS API Key is not set in database or environment variables');
       return {
         success: false,
         error: 'SMS API configuration is missing',
@@ -135,7 +139,7 @@ const sendSMS = async (phone, message) => {
     // Build API URL with query parameters
     // Parameters: api_key, senderid, number, message (all required)
     // Note: message is URL encoded to handle special characters like &, $, @ etc.
-    const url = `${SMS_CONFIG.apiUrl}?api_key=${apiKey}&senderid=${SMS_CONFIG.senderId}&number=${formattedPhone}&message=${encodeURIComponent(message)}`;
+    const url = `${SMS_CONFIG.apiUrl}?api_key=${apiKey}&senderid=${senderId}&number=${formattedPhone}&message=${encodeURIComponent(message)}`;
 
     // Send SMS via GET request
     // Increased timeout to 20 seconds as SMS API might take longer

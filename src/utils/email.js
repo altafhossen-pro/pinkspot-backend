@@ -1,14 +1,22 @@
 const nodemailer = require('nodemailer');
+const EmailSmsSettings = require('../modules/settings/emailSmsSettings.model');
 
 // Create transporter (configure according to your email service)
-const createTransporter = () => {
+const createTransporter = async () => {
+  const settings = await EmailSmsSettings.findOne();
+
+  const host = settings?.smtpHost || process.env.SMTP_HOST || 'smtp.gmail.com';
+  const port = settings?.smtpPort || parseInt(process.env.SMTP_PORT) || 587;
+  const user = settings?.smtpUser || process.env.SMTP_EMAIL;
+  const pass = settings?.smtpPass || process.env.SMTP_PASSWORD;
+
   const transporterConfig = {
-    host: process.env.SMTP_HOST || 'smtp.gmail.com',
-    port: parseInt(process.env.SMTP_PORT) || 587,
+    host,
+    port,
     secure: false, // true for 465, false for 587 (STARTTLS)
     auth: {
-      user: process.env.SMTP_EMAIL,
-      pass: process.env.SMTP_PASSWORD
+      user,
+      pass
     },
     tls: {
       rejectUnauthorized: false
@@ -21,11 +29,12 @@ const createTransporter = () => {
 // Send email function
 const sendEmail = async (to, subject, text, html = null) => {
   try {
-    const transporter = createTransporter();
+    const transporter = await createTransporter();
+    const settings = await EmailSmsSettings.findOne();
 
     // Use SMTP_EMAIL as from address to avoid spam (must match authenticated email)
-    const fromEmail = process.env.EMAIL_FROM || process.env.SMTP_EMAIL;
-    const fromName = process.env.EMAIL_FROM_NAME || 'Pinkspot';
+    const fromEmail = settings?.emailFrom || process.env.EMAIL_FROM || process.env.SMTP_EMAIL;
+    const fromName = settings?.emailFromName || process.env.EMAIL_FROM_NAME || 'Pinkspot';
 
     const mailOptions = {
       from: `"${fromName}" <${fromEmail}>`, // Proper format: "Name" <email@domain.com>
