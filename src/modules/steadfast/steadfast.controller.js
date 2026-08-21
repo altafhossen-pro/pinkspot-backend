@@ -81,8 +81,14 @@ exports.handleWebhook = async (req, res) => {
       updated_at
     } = payload;
 
-    if (!notification_type || !consignment_id || !invoice) {
-      const errMsg = 'Missing required fields';
+    // Ignore tracking_update completely
+    if (notification_type === 'tracking_update') {
+      if (isDebugLogEnabled) logSteadfastWebhook(`Ignored tracking_update for consignment_id: ${consignment_id}`);
+      return res.status(200).json({ status: 'success', message: 'Ignored tracking_update' });
+    }
+
+    if (!notification_type || !consignment_id) {
+      const errMsg = 'Missing required fields (notification_type or consignment_id)';
       if (isDebugLogEnabled) logSteadfastWebhook(`Validation Error: ${errMsg}`);
       sendTelegramAlert(settings, `🚨 <b>Steadfast Webhook Error</b>\n${errMsg}\nPayload: ${JSON.stringify(payload)}`);
       return res.status(400).json({ status: 'error', message: errMsg });
@@ -103,55 +109,69 @@ exports.handleWebhook = async (req, res) => {
 
     // 4. Update Order Status if delivery_status
     let orderUpdateMsg = 'No order status change required.';
+    let isIgnored = false;
+
     if (notification_type === 'delivery_status') {
-      let query = { orderId: invoice };
-      if (mongoose.Types.ObjectId.isValid(invoice)) {
-        query = { $or: [{ orderId: invoice }, { _id: invoice }] };
+      let query = null;
+      if (invoice) {
+        if (mongoose.Types.ObjectId.isValid(invoice)) {
+          query = { $or: [{ orderId: invoice }, { _id: invoice }] };
+        } else {
+          query = { orderId: invoice };
+        }
+      } else if (consignment_id) {
+        query = { steadfastConsignmentId: String(consignment_id) };
       }
 
-      const order = await Order.findOne(query);
+      if (query) {
+        const order = await Order.findOne(query);
 
-      if (order) {
-        let orderUpdated = false;
-        const normalizedStatus = status ? status.toLowerCase() : '';
+        if (order) {
+          let orderUpdated = false;
+          const normalizedStatus = status ? status.toLowerCase() : '';
 
-        if (normalizedStatus === 'delivered' && order.status !== 'delivered') {
-          order.status = 'delivered';
-          if (order.paymentStatus === 'pending') {
-            order.paymentStatus = 'paid';
+          if (normalizedStatus === 'delivered' && order.status !== 'delivered') {
+            order.status = 'delivered';
+            if (order.paymentStatus === 'pending') {
+              order.paymentStatus = 'paid';
+            }
+            if (typeof cod_amount === 'number' || typeof cod_amount === 'string') {
+              const finalAmount = (Number(cod_amount) || 0) - (Number(delivery_charge) || 0);
+              order.steadfastCollectedAmount = finalAmount;
+            }
+            if (!order.statusTimestamps) order.statusTimestamps = {};
+            order.statusTimestamps.delivered = new Date();
+            orderUpdated = true;
+            orderUpdateMsg = 'Order marked as Delivered.';
+          } else if (normalizedStatus === 'cancelled' && order.status !== 'cancelled') {
+            order.status = 'cancelled';
+            if (!order.statusTimestamps) order.statusTimestamps = {};
+            order.statusTimestamps.cancelled = new Date();
+            orderUpdated = true;
+            orderUpdateMsg = 'Order marked as Cancelled.';
           }
-          if (typeof cod_amount === 'number' || typeof cod_amount === 'string') {
-            const finalAmount = (Number(cod_amount) || 0) - (Number(delivery_charge) || 0);
-            order.steadfastCollectedAmount = finalAmount;
-          }
-          if (!order.statusTimestamps) order.statusTimestamps = {};
-          order.statusTimestamps.delivered = new Date();
-          orderUpdated = true;
-          orderUpdateMsg = 'Order marked as Delivered.';
-        } else if (normalizedStatus === 'cancelled' && order.status !== 'cancelled') {
-          order.status = 'cancelled';
-          if (!order.statusTimestamps) order.statusTimestamps = {};
-          order.statusTimestamps.cancelled = new Date();
-          orderUpdated = true;
-          orderUpdateMsg = 'Order marked as Cancelled.';
-        }
 
-        if (orderUpdated) {
-          await order.save();
+          if (orderUpdated) {
+            await order.save();
+          }
+        } else {
+          isIgnored = true;
+          orderUpdateMsg = `Order with invoice ${invoice} or consignment_id ${consignment_id} not found in database. Ignored.`;
         }
       } else {
-        orderUpdateMsg = `Order with invoice ${invoice} not found in database.`;
+        isIgnored = true;
+        orderUpdateMsg = `No valid query parameters (invoice or consignment_id) found. Ignored.`;
       }
     }
 
-    if (isDebugLogEnabled) logSteadfastWebhook(`Successfully Processed: ${invoice}. ${orderUpdateMsg}`);
+    if (isDebugLogEnabled) logSteadfastWebhook(`Successfully Processed: ${invoice || consignment_id}. ${orderUpdateMsg}`);
     
-    if (isSuccessMsgEnabled) {
+    if (isSuccessMsgEnabled && !isIgnored && notification_type === 'delivery_status') {
       const msg = `📦 <b>New Steadfast Callback</b>
-<b>Invoice:</b> ${invoice}
+<b>Invoice:</b> ${invoice || 'N/A'}
+<b>Consignment:</b> ${consignment_id || 'N/A'}
 <b>Type:</b> ${notification_type}
 <b>Status:</b> ${status || 'N/A'}
-<b>Message:</b> ${tracking_message || 'N/A'}
 <b>System Update:</b> ${orderUpdateMsg}`;
       sendTelegramAlert(settings, msg);
     }
