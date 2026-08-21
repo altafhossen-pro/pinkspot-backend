@@ -149,6 +149,10 @@ exports.updateUser = async (req, res) => {
   try {
     const updateData = { ...req.body };
 
+    if (updateData.password) {
+      updateData.password = await bcrypt.hash(updateData.password, 10);
+    }
+
     // Fetch the target user first to check if they are staff
     const targetUser = await User.findById(req.params.id).populate('roleId', 'name isSuperAdmin');
     if (!targetUser) {

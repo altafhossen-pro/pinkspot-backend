@@ -890,7 +890,17 @@ exports.getAdminOrders = async (req, res) => {
       // If unified search, try to detect if it's email or phone, otherwise search both
       // If individual filters, use them
       const emailSearch = search ? (search.includes('@') ? search : null) : email;
-      const phoneSearch = search ? search : phone;
+      let phoneSearch = search ? search : phone;
+
+      // Normalize phone search (extract last 11 digits if it contains mostly numbers)
+      if (phoneSearch && phoneSearch.replace(/\D/g, '').length >= 10) {
+        const digitsOnly = phoneSearch.replace(/\D/g, '');
+        if (digitsOnly.length >= 11) {
+          phoneSearch = digitsOnly.slice(-11); // Take last 11 digits
+        } else {
+          phoneSearch = digitsOnly;
+        }
+      }
 
       const userQuery = {};
 
@@ -933,15 +943,23 @@ exports.getAdminOrders = async (req, res) => {
       // Order ID search (exact match or partial match)
       searchConditions.push({ orderId: { $regex: searchTerm, $options: 'i' } });
 
+      // Steadfast Consignment ID search
+      searchConditions.push({ steadfastConsignmentId: { $regex: searchTerm, $options: 'i' } });
+
       // If we found matching users by email/phone, include their orders
       if (matchingUserIds.length > 0) {
         searchConditions.push({ user: { $in: matchingUserIds } });
       }
 
       // Phone search in order fields (always search phone fields for unified search)
-      searchConditions.push({ 'manualOrderInfo.phone': { $regex: searchTerm, $options: 'i' } });
-      searchConditions.push({ 'shippingAddress.phone': { $regex: searchTerm, $options: 'i' } });
-      searchConditions.push({ 'guestInfo.phone': { $regex: searchTerm, $options: 'i' } });
+      // Use the normalized phoneSearch for phone fields instead of the raw searchTerm
+      const normalizedPhoneTerm = (searchTerm.replace(/\D/g, '').length >= 10) 
+        ? searchTerm.replace(/\D/g, '').slice(-11) 
+        : searchTerm;
+
+      searchConditions.push({ 'manualOrderInfo.phone': { $regex: normalizedPhoneTerm, $options: 'i' } });
+      searchConditions.push({ 'shippingAddress.phone': { $regex: normalizedPhoneTerm, $options: 'i' } });
+      searchConditions.push({ 'guestInfo.phone': { $regex: normalizedPhoneTerm, $options: 'i' } });
 
       // Email search in guestInfo (always search email fields for unified search)
       searchConditions.push({ 'guestInfo.email': { $regex: searchTerm, $options: 'i' } });
@@ -2752,14 +2770,16 @@ exports.createManualOrder = async (req, res) => {
     const targetPhone = guestInfo?.phone || null;
     
     // We only check targetPhone for manual orders, typically we don't block admin IP
-    const blockRecord = await checkIsBlocked(null, targetPhone);
-    if (blockRecord) {
-      return sendResponse({
-        res,
-        statusCode: 403,
-        success: false,
-        message: blockRecord.responseMsg || 'This phone number has been blocked from placing orders.'
-      });
+    if (!req.body.overrideBlock) {
+      const blockRecord = await checkIsBlocked(null, targetPhone);
+      if (blockRecord) {
+        return sendResponse({
+          res,
+          statusCode: 403,
+          success: false,
+          message: blockRecord.responseMsg || 'This phone number has been blocked from placing orders.'
+        });
+      }
     }
 
     // Prepare order data
@@ -3200,7 +3220,8 @@ exports.getCustomerInfoByPhone = async (req, res) => {
       upazila: '',
       upazilaId: '',
       area: '',
-      areaId: ''
+      areaId: '',
+      notes: ''
     };
 
     // Find user for name only (not for address)
@@ -3217,9 +3238,14 @@ exports.getCustomerInfoByPhone = async (req, res) => {
     }
 
     // Always get address from last order's shippingAddress (not from user table)
+    const normalizedPhoneSearch = (phoneNumber.replace(/\D/g, '').length >= 10) 
+      ? phoneNumber.replace(/\D/g, '').slice(-11) 
+      : phoneNumber;
+
     const orderQueryOr = [
-      { 'manualOrderInfo.phone': phoneNumber },
-      { 'guestInfo.phone': phoneNumber }
+      { 'manualOrderInfo.phone': { $regex: normalizedPhoneSearch, $options: 'i' } },
+      { 'guestInfo.phone': { $regex: normalizedPhoneSearch, $options: 'i' } },
+      { 'shippingAddress.phone': { $regex: normalizedPhoneSearch, $options: 'i' } }
     ];
 
     // Only add user filter if user was found, otherwise it might match null/undefined user fields in guest orders
@@ -3232,21 +3258,22 @@ exports.getCustomerInfoByPhone = async (req, res) => {
       isDeleted: false
     })
       .sort({ createdAt: -1 }) // Get the latest order
-      .select('manualOrderInfo guestInfo shippingAddress deliveryAddress user');
+      .select('manualOrderInfo guestInfo shippingAddress deliveryAddress user notes');
 
     if (latestOrder) {
-      // Get name from order if not found in user table
-      if (!customerInfo.name) {
-        if (latestOrder.manualOrderInfo?.name) {
-          customerInfo.name = latestOrder.manualOrderInfo.name;
-        } else if (latestOrder.guestInfo?.name) {
-          customerInfo.name = latestOrder.guestInfo.name;
-        } else if (latestOrder.user) {
-          const orderUser = await User.findById(latestOrder.user).select('name firstName lastName');
-          if (orderUser) {
-            customerInfo.name = orderUser.name || `${orderUser.firstName || ''} ${orderUser.lastName || ''}`.trim();
-          }
+      // Prioritize name from last order over user account
+      const orderName = latestOrder.shippingAddress?.name || latestOrder.manualOrderInfo?.name || latestOrder.guestInfo?.name;
+      if (orderName) {
+        customerInfo.name = orderName;
+      } else if (!customerInfo.name && latestOrder.user) {
+        const orderUser = await User.findById(latestOrder.user).select('name firstName lastName');
+        if (orderUser) {
+          customerInfo.name = orderUser.name || `${orderUser.firstName || ''} ${orderUser.lastName || ''}`.trim();
         }
+      }
+
+      if (latestOrder.notes) {
+        customerInfo.notes = latestOrder.notes;
       }
 
       // Get address from shippingAddress (priority: shippingAddress > deliveryAddress)
@@ -3284,6 +3311,18 @@ exports.getCustomerInfoByPhone = async (req, res) => {
         customerInfo.address = latestOrder.guestInfo.address;
         customerInfo.street = latestOrder.guestInfo.address;
       }
+    }
+
+    // Check if phone is blocked
+    const blockRecord = await checkIsBlocked(null, phoneNumber);
+    if (blockRecord) {
+      customerInfo.isBlocked = true;
+      customerInfo.blockMessage = blockRecord.responseMsg || 'This phone number has been blocked.';
+      customerInfo.blockReason = blockRecord.reason || 'No reason provided';
+    } else {
+      customerInfo.isBlocked = false;
+      customerInfo.blockMessage = '';
+      customerInfo.blockReason = '';
     }
 
     return sendResponse({
