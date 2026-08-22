@@ -91,6 +91,8 @@ const shippingInfoSchema = new mongoose.Schema({
 
 const productSchema = new mongoose.Schema({
   title: { type: String, required: true },
+  subtitleName: { type: String, default: '' },
+  isSubtitleEnabled: { type: Boolean, default: true },
   shortDescription: { type: String, maxlength: 500 },
   description: { type: String },
   category: { type: mongoose.Schema.Types.ObjectId, ref: 'Category', required: true },

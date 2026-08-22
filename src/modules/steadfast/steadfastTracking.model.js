@@ -14,7 +14,6 @@ const steadfastTrackingSchema = new mongoose.Schema(
     },
     invoice: {
       type: String,
-      required: true,
       index: true,
     },
     status: {

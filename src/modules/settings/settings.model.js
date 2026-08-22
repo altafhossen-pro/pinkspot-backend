@@ -219,6 +219,10 @@ const settingsSchema = new mongoose.Schema({
         subtitle: { type: String, default: '' }
       }],
       lowStockThreshold: { type: Number, default: 10 }
+    },
+    globalProductSubtitle: {
+      text: { type: String, default: '' },
+      isEnabled: { type: Boolean, default: false }
     }
   },
 

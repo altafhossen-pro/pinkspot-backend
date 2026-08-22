@@ -20,7 +20,11 @@ const getPaginatedProducts = async (filter, req, res, message) => {
     const sort = req.query.sort ? `${req.query.sort} _id` : 'sortOrder -createdAt _id';
 
     // Additional filters from query
-    const queryFilter = { ...filter };
+    const queryFilter = { 
+      isActive: true,
+      status: 'published',
+      ...filter 
+    };
     
     if (req.query.category) {
       const categoryIds = req.query.category.split(',').map(id => id.trim());
@@ -46,7 +50,8 @@ const getPaginatedProducts = async (filter, req, res, message) => {
     if (req.query.brand) queryFilter.brand = req.query.brand;
     if (req.query.minPrice) queryFilter['priceRange.min'] = { $gte: Number(req.query.minPrice) };
     if (req.query.maxPrice) queryFilter['priceRange.max'] = { $lte: Number(req.query.maxPrice) };
-    if (req.query.isActive) queryFilter.isActive = req.query.isActive === 'true';
+    if (req.query.isActive !== undefined) queryFilter.isActive = req.query.isActive === 'true';
+    if (req.query.status) queryFilter.status = req.query.status;
     
     // Add search functionality
     if (req.query.search) {
@@ -497,7 +502,7 @@ exports.getAvailableFilters = async (req, res) => {
   try {
     const categoryIds = req.query.category ? req.query.category.split(',').map(id => id.trim()) : [];
 
-    let queryFilter = { isActive: true };
+    let queryFilter = { isActive: true, status: 'published' };
 
     // If categories are selected, filter by those categories including child categories
     if (categoryIds.length > 0) {
@@ -606,7 +611,7 @@ exports.searchProducts = async (req, res) => {
     }
 
     // Build search filter
-    let queryFilter = { isActive: true };
+    let queryFilter = { isActive: true, status: 'published' };
 
     // Text search across multiple fields
     if (searchQuery) {
