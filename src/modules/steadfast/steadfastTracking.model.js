@@ -5,7 +5,7 @@ const steadfastTrackingSchema = new mongoose.Schema(
     notification_type: {
       type: String,
       required: true,
-      enum: ['delivery_status', 'tracking_update'],
+      enum: ['delivery_status', 'tracking_update', 'return_status'],
     },
     consignment_id: {
       type: Number,

@@ -44,4 +44,7 @@ router.get('/telegram', verifyToken, verifyTokenAdmin, settingsController.getTel
 router.put('/telegram', verifyToken, verifyTokenAdmin, settingsController.updateTelegramSettings);
 router.post('/telegram/test', verifyToken, verifyTokenAdmin, settingsController.testTelegramConfig);
 
+// Global Product Subtitle endpoints
+router.patch('/global-subtitle', verifyToken, verifyTokenAdmin, settingsController.updateGlobalProductSubtitle);
+
 module.exports = router;

@@ -81,10 +81,10 @@ exports.handleWebhook = async (req, res) => {
       updated_at
     } = payload;
 
-    // Ignore tracking_update completely
-    if (notification_type === 'tracking_update') {
-      if (isDebugLogEnabled) logSteadfastWebhook(`Ignored tracking_update for consignment_id: ${consignment_id}`);
-      return res.status(200).json({ status: 'success', message: 'Ignored tracking_update' });
+    // Ignore notification types that don't require order processing
+    if (notification_type === 'tracking_update' || notification_type === 'return_status') {
+      if (isDebugLogEnabled) logSteadfastWebhook(`Ignored ${notification_type} for consignment_id: ${consignment_id}`);
+      return res.status(200).json({ status: 'success', message: `Ignored ${notification_type}` });
     }
 
     if (!notification_type || !consignment_id) {

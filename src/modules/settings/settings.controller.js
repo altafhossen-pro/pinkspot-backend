@@ -750,3 +750,42 @@ exports.testTelegramConfig = async (req, res) => {
     });
   }
 };
+exports.updateGlobalProductSubtitle = async (req, res) => {
+  try {
+    const { text, isEnabled } = req.body;
+    let settings = await Settings.findOne();
+    if (!settings) {
+      settings = new Settings();
+    }
+    if (!settings.siteSettings) {
+      settings.siteSettings = {};
+    }
+    settings.siteSettings.globalProductSubtitle = { text: text || '', isEnabled: isEnabled ?? false };
+    settings.updatedBy = req.user._id;
+    await settings.save();
+
+    const { Product } = require('../product/product.model');
+    if (settings.siteSettings.globalProductSubtitle.isEnabled) {
+      await Product.updateMany(
+        { isGlobalSubtitleOn: true },
+        { globalSubtitle: settings.siteSettings.globalProductSubtitle.text }
+      );
+    }
+
+    return sendResponse({
+      res,
+      statusCode: 200,
+      success: true,
+      message: 'Global subtitle updated and applied to products.',
+      data: settings.siteSettings.globalProductSubtitle
+    });
+  } catch (error) {
+    return sendResponse({
+      res,
+      statusCode: 500,
+      success: false,
+      message: error.message || 'Internal server error'
+    });
+  }
+};
+
