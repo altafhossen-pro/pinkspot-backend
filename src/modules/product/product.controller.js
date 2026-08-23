@@ -66,12 +66,53 @@ const getPaginatedProducts = async (filter, req, res, message) => {
       ];
     }
 
-    const total = await Product.countDocuments(queryFilter);
-    const products = await Product.find(queryFilter)
-      .populate('category')
-      .sort(sort)
-      .skip(skip)
-      .limit(limit);
+    let products;
+    let total;
+
+    if (req.query.isRandom === 'true') {
+      // Exclude already loaded products
+      if (req.query.excludeIds) {
+        const excludeArray = req.query.excludeIds.split(',').filter(id => mongoose.Types.ObjectId.isValid(id)).map(id => new mongoose.Types.ObjectId(id));
+        if (excludeArray.length > 0) {
+          queryFilter._id = { $nin: excludeArray };
+        }
+      }
+
+      // MongoDB aggregation for random products (Highly optimized for 10k+ products)
+      const pipeline = [
+        { $match: queryFilter },
+        { $sample: { size: limit } }
+      ];
+      
+      const randomProducts = await Product.aggregate(pipeline);
+      // We need to populate category manually since it's an aggregation
+      products = await Product.populate(randomProducts, { path: 'category' });
+      
+      // OPTIMIZATION: Skip expensive countDocuments on large collections for random feeds.
+      // If we got 'limit' items, assume there's at least one more page.
+      const hasMore = products.length === limit;
+      
+      return sendResponse({
+        res,
+        statusCode: 200,
+        success: true,
+        message,
+        data: products,
+        pagination: {
+          total: hasMore ? skip + limit + 1 : skip + products.length,
+          page,
+          limit,
+          totalPages: hasMore ? page + 1 : page,
+        },
+      });
+    } else {
+      total = await Product.countDocuments(queryFilter);
+      products = await Product.find(queryFilter)
+        .populate('category')
+        .sort(sort)
+        .skip(skip)
+        .limit(limit);
+    }
 
     return sendResponse({
       res,
