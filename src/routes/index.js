@@ -28,6 +28,7 @@ const roleRoutes = require('../modules/role/role.route');
 const affiliateRoutes = require('../modules/affiliate/affiliate.route');
 const contactRoutes = require('../modules/contact/contact.route');
 const notificationRoutes = require('../modules/notification/notification.route');
+const deliveryRuleRoutes = require('../modules/deliveryRule/deliveryRule.routes');
 
 const androidBannerRoutes = require('../modules/androidBanner/androidBanner.route');
 const steadfastRoutes = require('../modules/steadfast/steadfast.route');
@@ -61,6 +62,7 @@ router.use('/admin/role', roleRoutes);
 router.use('/affiliate', affiliateRoutes);
 router.use('/contact', contactRoutes);
 router.use('/notification', notificationRoutes);
+router.use('/delivery-rule', deliveryRuleRoutes);
 router.use('/steadfast', steadfastRoutes);
 router.use('/blocklist', blocklistRoutes);
 

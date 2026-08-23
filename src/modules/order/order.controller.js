@@ -30,7 +30,7 @@ const checkIsBlocked = async (ip, phone) => {
       query.push({ type: 'phone', value: phone });
     }
   }
-  
+
   if (query.length === 0) return false;
 
   const blocks = await Blocklist.find({
@@ -67,7 +67,7 @@ exports.createOrder = async (req, res) => {
     // Check if user IP or phone is blocked
     const userPhone = req.user.phone || req.user.phoneNumber;
     const shippingPhone = orderData.shippingAddress?.phone;
-    
+
     // Check both account phone and shipping phone
     const phonesToCheck = [];
     if (userPhone) phonesToCheck.push(userPhone);
@@ -656,25 +656,41 @@ exports.createOrder = async (req, res) => {
       }
     }
 
-    // Send order confirmation email to logged-in users (if enabled in settings)
+    // Send order confirmation notifications to logged-in users (if enabled in settings)
     if (order.user && !order.isGuestOrder) {
       try {
-        // Check if email sending is enabled
         const settings = await Settings.findOne();
-        if (settings && settings.isSendOrderConfirmationEmail !== false) {
+
+        // Check if email sending is enabled
+        if (settings && settings.isSendUserOrderEmail !== false) {
           // Populate user data for email
           const populatedOrder = await Order.findById(order._id).populate('user', 'name email');
           if (populatedOrder && populatedOrder.user && populatedOrder.user.email) {
             // Send email asynchronously (don't wait for it to complete)
             sendOrderConfirmationEmail(populatedOrder, populatedOrder.user).catch(emailError => {
-              console.error('Failed to send order confirmation email:', emailError);
+              console.error('Failed to send user order email:', emailError);
               // Don't fail the order creation if email fails
             });
           }
         }
-      } catch (emailError) {
-        console.error('Error preparing order confirmation email:', emailError);
-        // Don't fail the order creation if email fails
+
+        // Check if SMS sending is enabled
+        if (settings && settings.isSendUserOrderSMS !== false) {
+          const userPhone = order.shippingAddress?.phone;
+          if (userPhone) {
+            const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+            const trackingUrl = `${frontendUrl}/tracking?orderId=${order.orderId}`;
+            const totalAmount = order.total.toFixed(2);
+            const smsMessage = `Pinkspot: Order #${order.orderId} confirmed. Total: ${totalAmount} Tk. Track: ${trackingUrl}`;
+
+            sendCustomSMS(userPhone, smsMessage).catch(smsError => {
+              console.error('Failed to send user order SMS:', smsError);
+            });
+          }
+        }
+      } catch (notifyError) {
+        console.error('Error preparing user order notifications:', notifyError);
+        // Don't fail the order creation if notifications fail
       }
     }
 
@@ -712,7 +728,7 @@ exports.createOrder = async (req, res) => {
           quantity: item.quantity
         })) : []
       };
-      
+
       const msgType = isGuest ? 'NEW_ORDER_GUEST' : 'NEW_ORDER_EXISTING';
       // don't await so we don't block the response
       sendTelegramNotification(msgType, payload).catch(err => console.error(err));
@@ -953,8 +969,8 @@ exports.getAdminOrders = async (req, res) => {
 
       // Phone search in order fields (always search phone fields for unified search)
       // Use the normalized phoneSearch for phone fields instead of the raw searchTerm
-      const normalizedPhoneTerm = (searchTerm.replace(/\D/g, '').length >= 10) 
-        ? searchTerm.replace(/\D/g, '').slice(-11) 
+      const normalizedPhoneTerm = (searchTerm.replace(/\D/g, '').length >= 10)
+        ? searchTerm.replace(/\D/g, '').slice(-11)
         : searchTerm;
 
       searchConditions.push({ 'manualOrderInfo.phone': { $regex: normalizedPhoneTerm, $options: 'i' } });
@@ -1446,6 +1462,48 @@ exports.updateOrder = async (req, res) => {
             }
           }
         }
+      }
+
+      // Send Order Confirmed notifications
+      try {
+        const settings = await Settings.findOne();
+        let userPhone = null;
+        let userEmail = null;
+        let userName = null;
+        let recipientUser = null;
+
+        if (order.user) {
+          const populatedUser = await User.findById(order.user);
+          if (populatedUser) {
+            userPhone = populatedUser.phone || order.shippingAddress?.phone;
+            userEmail = populatedUser.email || order.shippingAddress?.email;
+            userName = populatedUser.name;
+            recipientUser = populatedUser;
+          }
+        } else {
+          userPhone = order.guestInfo?.phone || order.manualOrderInfo?.phone || order.shippingAddress?.phone;
+          userEmail = order.guestInfo?.email || order.manualOrderInfo?.email || order.shippingAddress?.email;
+          userName = order.guestInfo?.name || order.manualOrderInfo?.name || 'Guest User';
+          recipientUser = { email: userEmail, name: userName };
+        }
+
+        if (userEmail && settings && settings.isSendOrderStatusConfirmedEmail !== false) {
+          sendOrderConfirmationEmail(order, recipientUser).catch(err => {
+            console.error('Failed to send order confirmed email:', err);
+          });
+        }
+
+        if (userPhone && settings && settings.isSendOrderStatusConfirmedSMS !== false) {
+          const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+          const trackingUrl = `${frontendUrl}/tracking?orderId=${order.orderId}`;
+          const totalAmount = order.total.toFixed(2);
+          const smsMessage = `Pinkspot: Your order #${order.orderId} has been Confirmed. Total: ${totalAmount} Tk. Track: ${trackingUrl}`;
+          sendCustomSMS(userPhone, smsMessage).catch(err => {
+            console.error('Failed to send order confirmed SMS:', err);
+          });
+        }
+      } catch (notifyError) {
+        console.error('Error sending order confirmed notifications:', notifyError);
       }
     }
 
@@ -2175,6 +2233,47 @@ exports.updateOrderComprehensive = async (req, res) => {
       }
     }
 
+    // Send Order Confirmed notifications if status changed to 'confirmed'
+    if (updateData.status === 'confirmed' && oldOrder.status !== 'confirmed') {
+      try {
+        const settings = await Settings.findOne();
+        let userPhone = null;
+        let userEmail = null;
+        let userName = null;
+        let recipientUser = null;
+
+        if (updatedOrder.user) {
+          userPhone = updatedOrder.user.phone || updatedOrder.shippingAddress?.phone;
+          userEmail = updatedOrder.user.email || updatedOrder.shippingAddress?.email;
+          userName = updatedOrder.user.name;
+          recipientUser = updatedOrder.user;
+        } else {
+          userPhone = updatedOrder.guestInfo?.phone || updatedOrder.manualOrderInfo?.phone || updatedOrder.shippingAddress?.phone;
+          userEmail = updatedOrder.guestInfo?.email || updatedOrder.manualOrderInfo?.email || updatedOrder.shippingAddress?.email;
+          userName = updatedOrder.guestInfo?.name || updatedOrder.manualOrderInfo?.name || 'Guest User';
+          recipientUser = { email: userEmail, name: userName };
+        }
+
+        if (userEmail && settings && settings.isSendOrderStatusConfirmedEmail !== false) {
+          sendOrderConfirmationEmail(updatedOrder, recipientUser).catch(err => {
+            console.error('Failed to send order confirmed email:', err);
+          });
+        }
+
+        if (userPhone && settings && settings.isSendOrderStatusConfirmedSMS !== false) {
+          const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+          const trackingUrl = `${frontendUrl}/tracking?orderId=${updatedOrder.orderId}`;
+          const totalAmount = updatedOrder.total.toFixed(2);
+          const smsMessage = `Pinkspot: Your order #${updatedOrder.orderId} has been Confirmed. Total: ${totalAmount} Tk. Track: ${trackingUrl}`;
+          sendCustomSMS(userPhone, smsMessage).catch(err => {
+            console.error('Failed to send order confirmed SMS:', err);
+          });
+        }
+      } catch (notifyError) {
+        console.error('Error sending order confirmed notifications:', notifyError);
+      }
+    }
+
     // Handle totalSold updates for delivered state
     if (oldOrder.status === 'delivered' && updatedOrder.status !== 'delivered') {
       // Moves FROM delivered: subtract from totalSold
@@ -2676,30 +2775,34 @@ exports.createGuestOrder = async (req, res) => {
       }
     }
 
-    // Send SMS confirmation to guest if phone number is available (if enabled in settings)
-    const guestPhone = order.guestInfo?.phone || order.manualOrderInfo?.phone || order.shippingAddress?.phone;
-    if (guestPhone) {
-      try {
-        // Check if SMS sending is enabled
-        const settings = await Settings.findOne();
-        if (settings && settings.isSendGuestOrderConfirmationSMS !== false) {
-          const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-          const trackingUrl = `${frontendUrl}/tracking?orderId=${order.orderId}`;
-          const totalAmount = order.total.toFixed(2);
+    // Send notifications to guest (if enabled in settings)
+    try {
+      const settings = await Settings.findOne();
 
-          // Professional short SMS message
-          const smsMessage = `Pinkspot: Order #${order.orderId} confirmed. Total: ৳${totalAmount}. Track: ${trackingUrl}`;
+      const guestPhone = order.guestInfo?.phone || order.manualOrderInfo?.phone || order.shippingAddress?.phone;
+      const guestEmail = order.guestInfo?.email || order.manualOrderInfo?.email || order.shippingAddress?.email;
 
-          // Send SMS asynchronously (don't wait for it to complete)
-          sendCustomSMS(guestPhone, smsMessage).catch(smsError => {
-            console.error('Failed to send order confirmation SMS:', smsError);
-            // Don't fail the order creation if SMS fails
-          });
-        }
-      } catch (smsError) {
-        console.error('Error preparing order confirmation SMS:', smsError);
-        // Don't fail the order creation if SMS fails
+      // Send Email
+      if (guestEmail && settings && settings.isSendGuestOrderEmail !== false) {
+        const dummyUser = { email: guestEmail, name: order.guestInfo?.name || 'Guest User' };
+        sendOrderConfirmationEmail(order, dummyUser).catch(emailError => {
+          console.error('Failed to send guest order confirmation email:', emailError);
+        });
       }
+
+      // Send SMS
+      if (guestPhone && settings && settings.isSendGuestOrderSMS !== false) {
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+        const trackingUrl = `${frontendUrl}/tracking?orderId=${order.orderId}`;
+        const totalAmount = order.total.toFixed(2);
+        const smsMessage = `Pinkspot: Order #${order.orderId} confirmed. Total: ${totalAmount} Tk. Track: ${trackingUrl}`;
+
+        sendCustomSMS(guestPhone, smsMessage).catch(smsError => {
+          console.error('Failed to send guest order confirmation SMS:', smsError);
+        });
+      }
+    } catch (notifyError) {
+      console.error('Error preparing order confirmation notifications:', notifyError);
     }
 
     // Emit real-time notification to admin panel
@@ -2768,7 +2871,7 @@ exports.createManualOrder = async (req, res) => {
 
     // Optional: Check if the provided phone is blocked even for manual orders
     const targetPhone = guestInfo?.phone || null;
-    
+
     // We only check targetPhone for manual orders, typically we don't block admin IP
     if (!req.body.overrideBlock) {
       const blockRecord = await checkIsBlocked(null, targetPhone);
@@ -2946,29 +3049,48 @@ exports.createManualOrder = async (req, res) => {
       .populate('user', 'name email phone')
       .populate('items.product', 'title featuredImage slug');
 
-    // Send SMS confirmation for guest orders (manual orders with guest type) - if enabled in settings
-    if (orderType === 'guest' && guestInfo && guestInfo.phone) {
-      try {
-        // Check if SMS sending is enabled
-        const settings = await Settings.findOne();
-        if (settings && settings.isSendGuestOrderConfirmationSMS !== false) {
-          const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-          const trackingUrl = `${frontendUrl}/tracking?orderId=${order.orderId}`;
-          const totalAmount = order.total.toFixed(2);
+    // Send notifications (Email/SMS) based on settings
+    try {
+      const settings = await Settings.findOne();
 
-          // Professional short SMS message
-          const smsMessage = `Pinkspot: Order #${order.orderId} confirmed. Total: ৳${totalAmount}. Track: ${trackingUrl}`;
+      let userPhone = null;
+      let userEmail = null;
+      let userName = null;
 
-          // Send SMS asynchronously (don't wait for it to complete)
-          sendCustomSMS(guestInfo.phone, smsMessage).catch(smsError => {
-            console.error('Failed to send order confirmation SMS:', smsError);
-            // Don't fail the order creation if SMS fails
-          });
-        }
-      } catch (smsError) {
-        console.error('Error preparing order confirmation SMS:', smsError);
-        // Don't fail the order creation if SMS fails
+      if (orderType === 'existing' && populatedOrder.user) {
+        userPhone = populatedOrder.user.phone || populatedOrder.shippingAddress?.phone;
+        userEmail = populatedOrder.user.email || populatedOrder.shippingAddress?.email;
+        userName = populatedOrder.user.name;
+      } else if (orderType === 'guest') {
+        userPhone = guestInfo?.phone || populatedOrder.shippingAddress?.phone;
+        userEmail = guestInfo?.email || populatedOrder.shippingAddress?.email;
+        userName = guestInfo?.name;
       }
+
+      // Send Email
+      if (userEmail && settings && settings.isSendManualOrderEmail !== false) {
+        let recipientUser = (orderType === 'existing' && populatedOrder.user)
+          ? populatedOrder.user
+          : { email: userEmail, name: userName || 'Guest User' };
+
+        sendOrderConfirmationEmail(populatedOrder, recipientUser).catch(emailError => {
+          console.error('Failed to send manual order confirmation email:', emailError);
+        });
+      }
+
+      // Send SMS
+      if (userPhone && settings && settings.isSendManualOrderSMS !== false) {
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+        const trackingUrl = `${frontendUrl}/tracking?orderId=${order.orderId}`;
+        const totalAmount = order.total.toFixed(2);
+        const smsMessage = `Pinkspot: Order #${order.orderId} confirmed. Total: ${totalAmount} Tk. Track: ${trackingUrl}`;
+
+        sendCustomSMS(userPhone, smsMessage).catch(smsError => {
+          console.error('Failed to send manual order confirmation SMS:', smsError);
+        });
+      }
+    } catch (notifyError) {
+      console.error('Error preparing manual order notifications:', notifyError);
     }
 
     // Emit real-time notification to admin panel
@@ -3238,8 +3360,8 @@ exports.getCustomerInfoByPhone = async (req, res) => {
     }
 
     // Always get address from last order's shippingAddress (not from user table)
-    const normalizedPhoneSearch = (phoneNumber.replace(/\D/g, '').length >= 10) 
-      ? phoneNumber.replace(/\D/g, '').slice(-11) 
+    const normalizedPhoneSearch = (phoneNumber.replace(/\D/g, '').length >= 10)
+      ? phoneNumber.replace(/\D/g, '').slice(-11)
       : phoneNumber;
 
     const orderQueryOr = [
@@ -3579,7 +3701,7 @@ exports.updateOrderByUser = async (req, res) => {
 
     // Find the order
     const order = await Order.findOne({ _id: id, user: req.user._id });
-    
+
     if (!order) {
       return sendResponse({ res, statusCode: 404, success: false, message: 'Order not found' });
     }
@@ -3601,7 +3723,7 @@ exports.updateOrderByUser = async (req, res) => {
       if (!item.name || !item.price || !item.quantity || !item.subtotal) return sendResponse({ res, statusCode: 400, success: false, message: `Item ${i + 1}: Missing fields` });
       if (typeof item.price !== 'number' || item.price <= 0) return sendResponse({ res, statusCode: 400, success: false, message: `Item ${i + 1}: Invalid price` });
       if (typeof item.quantity !== 'number' || item.quantity <= 0 || !Number.isInteger(item.quantity)) return sendResponse({ res, statusCode: 400, success: false, message: `Item ${i + 1}: Invalid quantity` });
-      
+
       const expectedSubtotal = item.price * item.quantity;
       if (Math.abs(item.subtotal - expectedSubtotal) > 0.01) return sendResponse({ res, statusCode: 400, success: false, message: `Item ${i + 1}: Subtotal mismatch` });
 
@@ -3610,7 +3732,7 @@ exports.updateOrderByUser = async (req, res) => {
         if (!product) return sendResponse({ res, statusCode: 400, success: false, message: `Item ${i + 1}: Product not found` });
         if (!product.isActive || product.status !== 'published') return sendResponse({ res, statusCode: 400, success: false, message: `Item ${i + 1}: Product unavailable` });
         if (product.isForceOutOfStock) return sendResponse({ res, statusCode: 400, success: false, message: `Item ${i + 1}: Product out of stock` });
-        
+
         let actualPrice = null;
         if (item.variantSku && product.variants && product.variants.length > 0) {
           const variant = product.variants.find(v => v.sku === item.variantSku);
@@ -3654,9 +3776,9 @@ exports.updateOrderByUser = async (req, res) => {
     if (order.coupon) {
       try {
         await Coupon.findOneAndUpdate({ code: order.coupon }, { $inc: { usedCount: -1 } });
-      } catch (err) {}
+      } catch (err) { }
     }
-    
+
     // Reset discounts
     const coupon = null;
     const couponDiscount = 0;
@@ -3664,7 +3786,7 @@ exports.updateOrderByUser = async (req, res) => {
     const upsellDiscount = 0;
     const loyaltyDiscount = 0;
     const loyaltyPointsUsed = 0;
-    
+
     let shippingCost = order.shippingCost;
     if (orderData.shippingCost !== undefined) {
       shippingCost = Number(orderData.shippingCost) || 0;
@@ -3675,7 +3797,7 @@ exports.updateOrderByUser = async (req, res) => {
     // Update order
     order.items = orderData.items;
     if (orderData.shippingAddress) {
-        order.shippingAddress = orderData.shippingAddress;
+      order.shippingAddress = orderData.shippingAddress;
     }
     order.total = total;
     order.shippingCost = shippingCost;
@@ -3685,7 +3807,7 @@ exports.updateOrderByUser = async (req, res) => {
     order.upsellDiscount = upsellDiscount;
     order.loyaltyDiscount = loyaltyDiscount;
     order.loyaltyPointsUsed = loyaltyPointsUsed;
-    
+
     await order.save();
 
     return sendResponse({

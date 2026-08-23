@@ -111,10 +111,15 @@ const handleVisitorTracking = async (io, socket) => {
     });
 };
 
+const { handleOrderPresence } = require('./modules/order/order.socket');
+
 const setupSocketHandlers = (io) => {
     io.on('connection', (socket) => {
         // Initialize visitor tracking for this connection
         handleVisitorTracking(io, socket);
+        
+        // Initialize order presence tracking
+        handleOrderPresence(io, socket);
 
         // Additional socket namespaces or event listeners can be added here
         // ...

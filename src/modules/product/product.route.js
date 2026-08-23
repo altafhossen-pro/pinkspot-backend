@@ -19,6 +19,7 @@ router.get('/similar/:productId', productController.getSimilarProducts);
 router.post('/check-stock', productController.checkStockAvailability);
 
 // Public routes
+router.get('/sitemap-slugs', productController.getProductSlugsForSitemap);
 router.get('/', productController.getProducts);
 router.get('/slug/:slug', productController.getProductBySlug);
 router.get('/:id', productController.getProductById);

@@ -243,6 +243,30 @@ exports.getProducts = async (req, res) => {
   return getPaginatedProducts({}, req, res, 'Products fetched successfully');
 };
 
+// Public: Get all active product slugs for sitemap generation (Lean Query)
+exports.getProductSlugsForSitemap = async (req, res) => {
+  try {
+    const products = await Product.find({ isActive: true, status: 'published' })
+      .select('slug updatedAt -_id')
+      .lean();
+
+    return sendResponse({
+      res,
+      statusCode: 200,
+      success: true,
+      message: 'Product slugs fetched successfully for sitemap',
+      data: products,
+    });
+  } catch (error) {
+    return sendResponse({
+      res,
+      statusCode: 500,
+      success: false,
+      message: error.message || 'Server error',
+    });
+  }
+};
+
 // Admin: Get all products with search, filter, and pagination
 exports.getAdminProducts = async (req, res) => {
   try {
@@ -1332,8 +1356,8 @@ exports.getNextSkuForCategory = async (req, res) => {
     // Default prefix if not set
     const searchPrefix = prefix || '';
 
-    // Find all products in this category that match the prefix
-    const query = { category: categoryId };
+    // Find all products that match the prefix across all categories
+    const query = {};
     if (searchPrefix) {
       // Find products where any variant SKU starts with prefix
       query['variants.sku'] = { $regex: '^' + searchPrefix, $options: 'i' };

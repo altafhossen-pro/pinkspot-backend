@@ -153,6 +153,9 @@ exports.handleWebhook = async (req, res) => {
 
           if (orderUpdated) {
             await order.save();
+          } else {
+            isIgnored = true;
+            orderUpdateMsg = `No order status change required for status: ${status}. Ignored.`;
           }
         } else {
           isIgnored = true;

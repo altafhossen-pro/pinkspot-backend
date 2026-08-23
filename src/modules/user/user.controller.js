@@ -550,6 +550,7 @@ exports.getUsers = async (req, res) => {
     // Get users with pagination
     const users = await User.find(filter)
       .select('-password') // Exclude password
+      .populate('roleId', 'name')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit);

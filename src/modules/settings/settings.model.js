@@ -75,13 +75,37 @@ const settingsSchema = new mongoose.Schema({
   },
 
   // Email & SMS Settings
-  isSendOrderConfirmationEmail: {
+  isSendGuestOrderEmail: {
     type: Boolean,
     default: true
   },
-  isSendGuestOrderConfirmationSMS: {
+  isSendGuestOrderSMS: {
     type: Boolean,
-    default: false
+    default: true
+  },
+  isSendUserOrderEmail: {
+    type: Boolean,
+    default: true
+  },
+  isSendUserOrderSMS: {
+    type: Boolean,
+    default: true
+  },
+  isSendManualOrderEmail: {
+    type: Boolean,
+    default: true
+  },
+  isSendManualOrderSMS: {
+    type: Boolean,
+    default: true
+  },
+  isSendOrderStatusConfirmedEmail: {
+    type: Boolean,
+    default: true
+  },
+  isSendOrderStatusConfirmedSMS: {
+    type: Boolean,
+    default: true
   },
 
   // Affiliate Settings
@@ -182,6 +206,7 @@ const settingsSchema = new mongoose.Schema({
   // Site Settings (General Configuration)
   siteSettings: {
     logoUrl: { type: String, default: '' },
+    ogImage: { type: String, default: '' },
     isVideoAutoplayEnabled: { type: Boolean, default: true },
     videoMenu: {
       isEnabled: { type: Boolean, default: false },
