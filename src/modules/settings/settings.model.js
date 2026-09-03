@@ -161,6 +161,18 @@ const settingsSchema = new mongoose.Schema({
     }
   },
 
+  // Fraud Checker Settings
+  fraudCheckerSettings: {
+    isEnabled: {
+      type: Boolean,
+      default: false
+    },
+    cookieString: {
+      type: String,
+      default: ''
+    }
+  },
+
   // Telegram Settings
   telegramSettings: {
     botToken: {

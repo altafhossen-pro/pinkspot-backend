@@ -833,3 +833,144 @@ exports.updateGlobalProductSubtitle = async (req, res) => {
   }
 };
 
+// Get fraud checker settings only
+exports.getFraudCheckerSettings = async (req, res) => {
+  try {
+    let settings = await Settings.findOne();
+
+    if (!settings) {
+      settings = new Settings();
+      await settings.save();
+    }
+
+    return sendResponse({
+      res,
+      statusCode: 200,
+      success: true,
+      message: 'Fraud checker settings retrieved successfully',
+      data: settings.fraudCheckerSettings || { isEnabled: false, cookieString: '' }
+    });
+  } catch (error) {
+    return sendResponse({
+      res,
+      statusCode: 500,
+      success: false,
+      message: error.message || 'Server error'
+    });
+  }
+};
+
+// Update fraud checker settings only
+exports.updateFraudCheckerSettings = async (req, res) => {
+  try {
+    const fraudData = req.body;
+    let settings = await Settings.findOne();
+
+    if (!settings) {
+      settings = new Settings({ fraudCheckerSettings: fraudData });
+    } else {
+      settings.fraudCheckerSettings = {
+        ...settings.fraudCheckerSettings,
+        ...fraudData
+      };
+    }
+    settings.updatedBy = req.user._id;
+
+    await settings.save();
+
+    return sendResponse({
+      res,
+      statusCode: 200,
+      success: true,
+      message: 'Fraud checker settings updated successfully',
+      data: settings.fraudCheckerSettings
+    });
+  } catch (error) {
+    return sendResponse({
+      res,
+      statusCode: 500,
+      success: false,
+      message: error.message || 'Server error'
+    });
+  }
+};
+
+// Check fraud status using Steadfast
+exports.checkFraudStatus = async (req, res) => {
+  try {
+    const { phone } = req.params;
+    
+    if (!phone) {
+      return sendResponse({
+        res,
+        statusCode: 400,
+        success: false,
+        message: 'Phone number is required'
+      });
+    }
+
+    const settings = await Settings.findOne();
+    const fraudSettings = settings?.fraudCheckerSettings;
+
+    if (!fraudSettings || !fraudSettings.isEnabled) {
+      return sendResponse({
+        res,
+        statusCode: 400,
+        success: false,
+        message: 'Fraud checker is disabled in settings'
+      });
+    }
+
+    if (!fraudSettings.cookieString) {
+      return sendResponse({
+        res,
+        statusCode: 400,
+        success: false,
+        message: 'Steadfast cookie is missing in settings'
+      });
+    }
+
+    const axios = require('axios');
+    
+    // Steadfast endpoints:
+    // https://steadfast.com.bd/user/recipients/by-phone/{phone} (optional, gets name)
+    // https://steadfast.com.bd/user/consignment/getbyphone/{phone} (gets counts)
+    
+    const response = await axios.get(`https://steadfast.com.bd/user/consignment/getbyphone/${phone}`, {
+      headers: {
+        'Cookie': fraudSettings.cookieString,
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'application/json, text/plain, */*',
+        'Referer': 'https://steadfast.com.bd/user/dashboard'
+      }
+    });
+
+    return sendResponse({
+      res,
+      statusCode: 200,
+      success: true,
+      message: 'Fraud status retrieved successfully',
+      data: response.data
+    });
+    
+  } catch (error) {
+    console.error('Fraud Check Error:', error.response?.data || error.message);
+    
+    // Handle Cloudflare 403 or unauthorized
+    if (error.response && (error.response.status === 401 || error.response.status === 403)) {
+      return sendResponse({
+        res,
+        statusCode: 403,
+        success: false,
+        message: 'Cookie expired or request blocked by Cloudflare. Please update cookie in settings.'
+      });
+    }
+    
+    return sendResponse({
+      res,
+      statusCode: 500,
+      success: false,
+      message: error.message || 'Server error while checking fraud status'
+    });
+  }
+};

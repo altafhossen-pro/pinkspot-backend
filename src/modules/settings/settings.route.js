@@ -47,4 +47,9 @@ router.post('/telegram/test', verifyToken, verifyTokenAdmin, settingsController.
 // Global Product Subtitle endpoints
 router.patch('/global-subtitle', verifyToken, verifyTokenAdmin, settingsController.updateGlobalProductSubtitle);
 
+// Fraud Checker settings endpoints
+router.get('/fraud-checker', verifyToken, verifyTokenAdmin, settingsController.getFraudCheckerSettings);
+router.put('/fraud-checker', verifyToken, verifyTokenAdmin, settingsController.updateFraudCheckerSettings);
+router.get('/fraud-checker/check/:phone', verifyToken, verifyTokenAdmin, settingsController.checkFraudStatus);
+
 module.exports = router;
