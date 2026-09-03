@@ -78,15 +78,44 @@ const getPaginatedProducts = async (filter, req, res, message) => {
         }
       }
 
-      // MongoDB aggregation for random products (Highly optimized for 10k+ products)
+      // ✅ Optimized: single aggregation pipeline — no separate populate() call
+      // $lookup joins category in-pipeline, $project strips heavy fields
       const pipeline = [
         { $match: queryFilter },
-        { $sample: { size: limit } }
+        { $sample: { size: limit } },
+        {
+          $lookup: {
+            from: 'categories',
+            localField: 'category',
+            foreignField: '_id',
+            as: 'category',
+            // Only fetch what frontend actually needs from category
+            pipeline: [
+              { $project: { _id: 1, name: 1, slug: 1, icon: 1 } }
+            ]
+          }
+        },
+        {
+          $unwind: {
+            path: '$category',
+            preserveNullAndEmptyArrays: true
+          }
+        },
+        {
+          // Strip heavy fields not needed by ProductCard
+          $project: {
+            description: 0,
+            additionalInfo: 0,
+            seo: 0,
+            shippingInfo: 0,
+            reviews: 0,
+            specifications: 0,
+            productVideos: 0
+          }
+        }
       ];
       
-      const randomProducts = await Product.aggregate(pipeline);
-      // We need to populate category manually since it's an aggregation
-      products = await Product.populate(randomProducts, { path: 'category' });
+      products = await Product.aggregate(pipeline);
       
       // OPTIMIZATION: Skip expensive countDocuments on large collections for random feeds.
       // If we got 'limit' items, assume there's at least one more page.
@@ -139,6 +168,16 @@ const getPaginatedProducts = async (filter, req, res, message) => {
 
 exports.createProduct = async (req, res) => {
   try {
+    // Sanitize variant attributes (remove empty values)
+    if (req.body.variants && Array.isArray(req.body.variants)) {
+      req.body.variants = req.body.variants.map(variant => {
+        if (variant.attributes && Array.isArray(variant.attributes)) {
+          variant.attributes = variant.attributes.filter(attr => attr && attr.value !== undefined && attr.value !== null && String(attr.value).trim() !== '');
+        }
+        return variant;
+      });
+    }
+
     // Custom Validation
     const { title, category, slug, variants } = req.body;
     const errors = [];
@@ -972,6 +1011,16 @@ exports.updateProduct = async (req, res) => {
   try {
     const { id } = req.params;
     const updates = req.body;
+
+    // Sanitize variant attributes (remove empty values)
+    if (updates.variants && Array.isArray(updates.variants)) {
+      updates.variants = updates.variants.map(variant => {
+        if (variant.attributes && Array.isArray(variant.attributes)) {
+          variant.attributes = variant.attributes.filter(attr => attr && attr.value !== undefined && attr.value !== null && String(attr.value).trim() !== '');
+        }
+        return variant;
+      });
+    }
     
     // Sanitize slug to remove leading/trailing hyphens
     if (updates.slug) {

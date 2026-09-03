@@ -3,6 +3,31 @@ const sendResponse = require('../../utils/sendResponse');
 const Settings = require('./settings.model');
 const EmailSmsSettings = require('./emailSmsSettings.model');
 
+// ─── In-Memory Cache for site-settings ────────────────────────────────────────
+// site-settings এ rarely change হয়, কিন্তু প্রতিটা page load এ DB hit হয়।
+// এই simple cache টা প্রতি 5 মিনিটে একবার DB এ যাবে, বাকি সময় memory থেকে দেবে।
+let _siteSettingsCache = null;
+let _siteSettingsCachedAt = 0;
+const SITE_SETTINGS_TTL = 5 * 60 * 1000; // 5 minutes
+
+function getSiteSettingsFromCache() {
+  if (_siteSettingsCache && (Date.now() - _siteSettingsCachedAt) < SITE_SETTINGS_TTL) {
+    return _siteSettingsCache;
+  }
+  return null;
+}
+
+function setSiteSettingsCache(data) {
+  _siteSettingsCache = data;
+  _siteSettingsCachedAt = Date.now();
+}
+
+function invalidateSiteSettingsCache() {
+  _siteSettingsCache = null;
+  _siteSettingsCachedAt = 0;
+}
+// ──────────────────────────────────────────────────────────────────────────────
+
 // Get current settings
 exports.getSettings = async (req, res) => {
   try {
@@ -286,7 +311,7 @@ exports.updateEmailSMSSettings = async (req, res) => {
 exports.testEmailConfig = async (req, res) => {
   try {
     const emailConfig = req.body;
-    
+
     // Create a temporary transporter with the provided config to test it
     const nodemailer = require('nodemailer');
     const host = emailConfig.smtpHost || process.env.SMTP_HOST || 'smtp.gmail.com';
@@ -501,7 +526,7 @@ exports.getSteadfastSettings = async (req, res) => {
     if (!settings) {
       settings = new Settings();
     }
-    
+
     // Generate webhookToken if it doesn't exist
     if (!settings.steadfastSettings || !settings.steadfastSettings.webhookToken) {
       const crypto = require('crypto');
@@ -569,6 +594,19 @@ exports.updateSteadfastSettings = async (req, res) => {
 // Get site settings
 exports.getSiteSettings = async (req, res) => {
   try {
+    // Cache hit — DB query এড়িয়ে যাও
+    const cached = getSiteSettingsFromCache();
+    if (cached) {
+      return sendResponse({
+        res,
+        statusCode: 200,
+        success: true,
+        message: 'Site settings retrieved successfully',
+        data: cached
+      });
+    }
+
+    // Cache miss — DB থেকে fetch করো এবং cache এ রাখো
     let settings = await Settings.findOne();
 
     // If no settings exist, create default settings
@@ -577,12 +615,15 @@ exports.getSiteSettings = async (req, res) => {
       await settings.save();
     }
 
+    const siteData = settings.siteSettings || {};
+    setSiteSettingsCache(siteData);
+
     return sendResponse({
       res,
       statusCode: 200,
       success: true,
       message: 'Site settings retrieved successfully',
-      data: settings.siteSettings || {}
+      data: siteData
     });
   } catch (error) {
     return sendResponse({
@@ -614,6 +655,9 @@ exports.updateSiteSettings = async (req, res) => {
     settings.updatedBy = req.user._id;
 
     await settings.save();
+
+    // Cache invalidate করো — পরের request এ fresh data যাবে DB থেকে
+    invalidateSiteSettingsCache();
 
     return sendResponse({
       res,
@@ -711,7 +755,7 @@ exports.testTelegramConfig = async (req, res) => {
 
     const message = 'Hello! This is a test message from your Pinkspot store to confirm your Telegram configuration is working properly.';
     const telegramUrl = `https://api.telegram.org/bot${botToken}/sendMessage`;
-    
+
     // Using fetch (available in Node 18+)
     const response = await fetch(telegramUrl, {
       method: 'POST',

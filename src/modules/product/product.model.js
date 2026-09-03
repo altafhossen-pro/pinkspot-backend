@@ -171,6 +171,12 @@ productSchema.index({ createdAt: -1 });
 productSchema.index({ averageRating: -1 });
 productSchema.index({ totalSold: -1 });
 
+// ✅ Compound indexes for the most frequent query patterns
+// Most queries filter by isActive + status together, then sort/filter by other fields
+productSchema.index({ isActive: 1, status: 1, category: 1 });       // category filter queries
+productSchema.index({ isActive: 1, status: 1, createdAt: -1 });     // default sort (newest first)
+productSchema.index({ isActive: 1, status: 1, sortOrder: 1 });      // sortOrder-based listing
+
 productSchema.virtual('calculatedPriceRange').get(function () {
   if (this.variants && this.variants.length > 0) {
     const prices = this.variants.map(v => v.currentPrice).filter(p => p > 0);
