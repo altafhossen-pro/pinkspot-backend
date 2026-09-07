@@ -66,6 +66,11 @@ router.use('/delivery-rule', deliveryRuleRoutes);
 router.use('/steadfast', steadfastRoutes);
 router.use('/blocklist', blocklistRoutes);
 
+// Billing System Secure Routes
+const billingRoutes = require('../modules/billing/billing.route');
+const billingAuth = require('../middlewares/billingAuth');
+router.use('/billing', billingAuth, billingRoutes);
+
 // Health check route
 router.get('/health', (req, res) => {
   res.status(200).json({
