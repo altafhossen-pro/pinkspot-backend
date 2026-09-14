@@ -1,7 +1,24 @@
 const axios = require('axios');
+const fs = require('fs');
+const path = require('path');
 const Settings = require('../settings/settings.model');
 
 const BASE_URL = 'https://portal.packzy.com/api/v1';
+
+const logSteadfastError = (endpoint, payload, response) => {
+    try {
+        const logDir = path.join(__dirname, '../../../logs');
+        if (!fs.existsSync(logDir)) {
+            fs.mkdirSync(logDir, { recursive: true });
+        }
+        const logFile = path.join(logDir, 'steadfast_errors.log');
+        const timestamp = new Date().toISOString();
+        const logEntry = `\n--- ${timestamp} ---\nEndpoint: ${endpoint}\nPayload: ${JSON.stringify(payload)}\nResponse: ${JSON.stringify(response)}\n-------------------------\n`;
+        fs.appendFileSync(logFile, logEntry);
+    } catch (err) {
+        console.error('Failed to write steadfast log:', err);
+    }
+};
 
 /**
  * Get steadfast credentials from settings
@@ -45,6 +62,16 @@ const createOrder = async (orderData) => {
                 }
             }
         );
+        
+        // Validate if Steadfast returned a business-level error with HTTP 200
+        if (response.data?.status === 400 || response.data?.errors || response.data?.status === 'error' || response.data?.success === false) {
+            logSteadfastError('/create_order', orderData, response.data);
+            return {
+                success: false,
+                error: response.data,
+                statusCode: response.data?.status || 400
+            };
+        }
         
         return {
             success: true,
@@ -95,6 +122,16 @@ const createBulkOrders = async (ordersData) => {
                 }
             }
         );
+        
+        // Validate if Steadfast returned a business-level error with HTTP 200
+        if (response.data?.status === 400 || response.data?.errors || response.data?.status === 'error' || response.data?.success === false) {
+            logSteadfastError('/create_order/bulk-order', ordersData, response.data);
+            return {
+                success: false,
+                error: response.data,
+                statusCode: response.data?.status || 400
+            };
+        }
         
         return {
             success: true,
