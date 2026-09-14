@@ -1882,6 +1882,17 @@ exports.updateOrderComprehensive = async (req, res) => {
       // Check for individual item changes
       const itemChanges = [];
 
+      // Check if items length changed (added or removed)
+      if (oldOrder.items.length !== updateData.items.length) {
+        itemChanges.push({
+          field: 'items',
+          oldValue: `${oldOrder.items.length} items`,
+          newValue: `${updateData.items.length} items`,
+          updateType: 'item_update',
+          itemName: oldOrder.items.length < updateData.items.length ? 'Item(s) added' : 'Item(s) removed'
+        });
+      }
+
       updateData.items.forEach((newItem, index) => {
         const oldItem = oldOrder.items[index];
         if (oldItem) {
