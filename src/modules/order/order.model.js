@@ -88,6 +88,7 @@ const orderSchema = new mongoose.Schema({
     loyaltyPointsUsed: { type: Number, default: 0 },
     shippingCost: { type: Number, default: 0 },
     orderNotes: { type: String },
+    isDraftMode: { type: Boolean, default: false },
     tracking: [trackingSchema],
     // Status timestamps for tracking
     statusTimestamps: {

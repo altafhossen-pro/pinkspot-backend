@@ -894,7 +894,8 @@ exports.getAdminOrders = async (req, res) => {
       includeDeleted = false, // Optional: include deleted orders
       startDate, // Date range filter - start date (ISO format or YYYY-MM-DD)
       endDate, // Date range filter - end date (ISO format or YYYY-MM-DD)
-      orderSource // Order Source filter
+      orderSource, // Order Source filter
+      isDraftMode
     } = req.query;
 
     // Use unified search if provided, otherwise fall back to individual filters
@@ -1052,6 +1053,19 @@ exports.getAdminOrders = async (req, res) => {
       if (Object.keys(dateFilter).length > 0) {
         filterConditions.push({ createdAt: dateFilter });
       }
+    }
+
+    // Draft mode filter
+    if (isDraftMode !== undefined) {
+      filterConditions.push({ isDraftMode: isDraftMode === 'true' });
+    } else {
+      // By default, exclude draft orders from list
+      filterConditions.push({
+        $or: [
+          { isDraftMode: false },
+          { isDraftMode: { $exists: false } }
+        ]
+      });
     }
 
     // Deleted filter
@@ -1322,6 +1336,13 @@ exports.updateOrder = async (req, res) => {
         ...oldOrder.statusTimestamps,
         [newStatus]: new Date()
       };
+
+      // Draft mode logic: remove from draft if status moves to processing or beyond
+      if (oldOrder.isDraftMode) {
+        if (newStatus === 'processing' || newStatus === 'shipped' || newStatus === 'delivered') {
+          updates.isDraftMode = false;
+        }
+      }
     }
 
     // Handle partial return quantities if provided
@@ -2855,7 +2876,7 @@ exports.createGuestOrder = async (req, res) => {
 
 exports.createManualOrder = async (req, res) => {
   try {
-    const { orderType, items, subtotal, discount, shippingCost, totalAmount, status, notes, userId, guestInfo, deliveryAddress, orderSource } = req.body;
+    const { orderType, items, subtotal, discount, shippingCost, totalAmount, status, notes, userId, guestInfo, deliveryAddress, orderSource, isDraftMode } = req.body;
 
     // Validate required fields
     if (!items || items.length === 0) {
@@ -2905,6 +2926,8 @@ exports.createManualOrder = async (req, res) => {
       shippingCost: shippingCost || 0,
       shippingAddress: {
         label: 'Manual Order',
+        name: guestInfo?.name || '',
+        phone: guestInfo?.phone || '',
         street: deliveryAddress || '',
         city: '',
         state: '',
@@ -2914,12 +2937,14 @@ exports.createManualOrder = async (req, res) => {
       status: status || 'confirmed',
       orderNotes: notes || '',
       orderSource: orderSource || 'manual', // Set order source from request or default to 'manual'
+      isReadByAdmin: (orderSource !== 'website'), // Only show unread notification if source is 'website'
       createdBy: req.user._id, // Admin who created the order
       ipAddress: clientIp ? clientIp.toString().trim() : undefined,
       statusTimestamps: {
         pending: new Date(),
         confirmed: new Date()
-      }
+      },
+      isDraftMode: isDraftMode || false
     };
 
     // Process items and validate products
@@ -2989,6 +3014,9 @@ exports.createManualOrder = async (req, res) => {
             ].filter(Boolean).join(', ')
             : user.address || ''
         };
+        orderData.shippingAddress.name = orderData.manualOrderInfo.name;
+        orderData.shippingAddress.phone = orderData.manualOrderInfo.phone;
+        orderData.shippingAddress.street = deliveryAddress || orderData.manualOrderInfo.address;
       }
     } else if (orderType === 'guest' && guestInfo) {
       // For guest orders, store guest info in manualOrderInfo for easy search
@@ -3002,7 +3030,9 @@ exports.createManualOrder = async (req, res) => {
       // For guest orders, we'll store guest info in shipping address
       orderData.shippingAddress = {
         label: 'Guest Order',
-        street: guestInfo.address || '',
+        name: guestInfo.name || '',
+        phone: guestInfo.phone || '',
+        street: guestInfo.address || deliveryAddress || '',
         city: '',
         state: '',
         postalCode: '',
@@ -3107,7 +3137,7 @@ exports.createManualOrder = async (req, res) => {
     // Emit real-time notification to admin panel
     try {
       const io = socketConfig.getIo();
-      if (io) {
+      if (io && order.orderSource === 'website') {
         io.emit('new-order', {
           _id: order._id,
           orderId: order.orderId,
@@ -3841,7 +3871,14 @@ exports.getNotifications = async (req, res) => {
     const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;
 
-    const query = { isDeleted: false };
+    // Only include orders from 'website' (or older orders without orderSource)
+    const query = { 
+      isDeleted: false,
+      $or: [
+        { orderSource: 'website' },
+        { orderSource: { $exists: false } }
+      ]
+    };
 
     // Get paginated notifications
     const notifications = await Order.find(query)

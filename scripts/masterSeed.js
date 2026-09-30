@@ -70,7 +70,7 @@ const masterSeed = async () => {
     // 3. Create Super Admin User
     console.log('👤 Checking Super Admin user...');
     const adminEmail = process.env.SUPERADMIN_EMAIL || 'admin@gmail.com';
-    const adminPassword = process.env.SUPERADMIN_PASSWORD || 'password123';
+    const adminPassword = process.env.SUPERADMIN_PASSWORD || '12345678';
     
     let adminUser = await User.findOne({ email: adminEmail });
     if (!adminUser) {

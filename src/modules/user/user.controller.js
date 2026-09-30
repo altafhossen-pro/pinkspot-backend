@@ -132,9 +132,9 @@ exports.login = async (req, res) => {
     if (!user) {
       return sendResponse({
         res,
-        statusCode: 404,
+        statusCode: 401,
         success: false,
-        message: 'User not found',
+        message: 'No account found with this email or phone number',
       });
     }
     // Check password
