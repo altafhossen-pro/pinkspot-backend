@@ -2,7 +2,7 @@ const { Order } = require('./order.model');
 const { Product } = require('../product/product.model');
 const { User } = require('../user/user.model');
 const { Loyalty } = require('../loyalty/loyalty.model');
-const { Coupon } = require('../coupon/coupon.model');
+const Coupon = require('../coupon/coupon.model');
 const Settings = require('../settings/settings.model');
 const { Division, District, Upazila, DhakaCity } = require('../address/address.model');
 const { StockTracking } = require('../inventory/stockTracking.model');
@@ -457,6 +457,43 @@ exports.createOrder = async (req, res) => {
       }
     }
 
+    // Build calculation log for audit trailing
+    const calculationLog = [];
+    const calculatedSubtotal = orderData.items?.reduce((sum, item) => sum + (item.subtotal || 0), 0) || orderData.total;
+    calculationLog.push({ step: 'subtotal', amount: calculatedSubtotal, description: 'Initial items subtotal' });
+    
+    if (orderData.shippingCost > 0) {
+      calculationLog.push({ step: 'shipping', amount: orderData.shippingCost, description: 'Shipping cost added' });
+    }
+    if (orderData.discount > 0) {
+      // In website orders, the general 'discount' field is used for category discounts
+      calculationLog.push({ step: 'category_discount', amount: -orderData.discount, description: 'Category discount applied on items' });
+    }
+    if (orderData.couponDiscount > 0) {
+      let couponDesc = `Coupon '${orderData.coupon}' applied`;
+      try {
+        const usedCoupon = await mongoose.model('Coupon').findOne({ code: orderData.coupon.toUpperCase() });
+        if (usedCoupon) {
+          couponDesc = `Coupon '${orderData.coupon}' applied. Type: ${usedCoupon.discountType === 'percentage' ? usedCoupon.discountValue + '%' : '৳' + usedCoupon.discountValue + ' fixed'}. Usage before this order: ${usedCoupon.usedCount} times. Min order required: ৳${usedCoupon.minOrderAmount}.`;
+        }
+      } catch (err) {
+        console.error('Error fetching coupon for log:', err);
+      }
+      calculationLog.push({ step: 'coupon', amount: -orderData.couponDiscount, description: couponDesc });
+    }
+    if (orderData.loyaltyDiscount > 0) {
+      calculationLog.push({ step: 'loyalty', amount: -orderData.loyaltyDiscount, description: `Loyalty points (${orderData.loyaltyPointsUsed}) redeemed` });
+    }
+    if (orderData.upsellDiscount > 0) {
+      calculationLog.push({ step: 'upsell', amount: -orderData.upsellDiscount, description: 'Upsell product discount applied' });
+    }
+    if (orderData.affiliateDiscount > 0) {
+      calculationLog.push({ step: 'affiliate', amount: -orderData.affiliateDiscount, description: 'Affiliate code discount applied' });
+    }
+    calculationLog.push({ step: 'total', amount: orderData.total, description: `Final calculated total. Source: ${orderData.orderSource || 'website'}, Type: ${orderData.orderType || 'auto'}` });
+    
+    orderData.calculationLog = calculationLog;
+
     // Set default status to 'pending' for all orders
     orderData.status = 'pending';
     orderData.statusTimestamps = {
@@ -479,8 +516,8 @@ exports.createOrder = async (req, res) => {
     // Handle coupon usage increment
     if (orderData.coupon) {
       try {
-        await Coupon.findOneAndUpdate(
-          { code: orderData.coupon },
+        await mongoose.model('Coupon').findOneAndUpdate(
+          { code: orderData.coupon.toUpperCase() },
           { $inc: { usedCount: 1 } }
         );
       } catch (couponError) {
@@ -2666,6 +2703,43 @@ exports.createGuestOrder = async (req, res) => {
       }
     }
 
+    // Build calculation log for audit trailing
+    const calculationLog = [];
+    const orderSubtotal = orderData.items?.reduce((sum, item) => sum + (item.subtotal || 0), 0) || orderData.total;
+    calculationLog.push({ step: 'subtotal', amount: orderSubtotal, description: 'Initial items subtotal' });
+    
+    if (orderData.shippingCost > 0) {
+      calculationLog.push({ step: 'shipping', amount: orderData.shippingCost, description: 'Shipping cost added' });
+    }
+    if (orderData.discount > 0) {
+      // In website orders, the general 'discount' field is used for category discounts
+      calculationLog.push({ step: 'category_discount', amount: -orderData.discount, description: 'Category discount applied on items' });
+    }
+    if (orderData.couponDiscount > 0) {
+      let couponDesc = `Coupon '${orderData.coupon}' applied`;
+      try {
+        const usedCoupon = await mongoose.model('Coupon').findOne({ code: orderData.coupon.toUpperCase() });
+        if (usedCoupon) {
+          couponDesc = `Coupon '${orderData.coupon}' applied. Type: ${usedCoupon.discountType === 'percentage' ? usedCoupon.discountValue + '%' : '৳' + usedCoupon.discountValue + ' fixed'}. Usage before this order: ${usedCoupon.usedCount} times. Min order required: ৳${usedCoupon.minOrderAmount}.`;
+        }
+      } catch (err) {
+        console.error('Error fetching coupon for log:', err);
+      }
+      calculationLog.push({ step: 'coupon', amount: -orderData.couponDiscount, description: couponDesc });
+    }
+    if (orderData.loyaltyDiscount > 0) {
+      calculationLog.push({ step: 'loyalty', amount: -orderData.loyaltyDiscount, description: `Loyalty points (${orderData.loyaltyPointsUsed}) redeemed` });
+    }
+    if (orderData.upsellDiscount > 0) {
+      calculationLog.push({ step: 'upsell', amount: -orderData.upsellDiscount, description: 'Upsell product discount applied' });
+    }
+    if (orderData.affiliateDiscount > 0) {
+      calculationLog.push({ step: 'affiliate', amount: -orderData.affiliateDiscount, description: 'Affiliate code discount applied' });
+    }
+    calculationLog.push({ step: 'total', amount: orderData.total, description: `Final calculated total. Source: ${orderData.orderSource || 'guest checkout'}, Type: guest` });
+    
+    orderData.calculationLog = calculationLog;
+
     // Set default values for guest orders
     orderData.status = 'pending';
     orderData.paymentStatus = orderData.paymentStatus || 'pending';
@@ -2678,6 +2752,18 @@ exports.createGuestOrder = async (req, res) => {
     // Create the order
     const order = new Order(orderData);
     await order.save();
+
+    // Handle coupon usage increment
+    if (orderData.coupon) {
+      try {
+        await mongoose.model('Coupon').findOneAndUpdate(
+          { code: orderData.coupon.toUpperCase() },
+          { $inc: { usedCount: 1 } }
+        );
+      } catch (couponError) {
+        // Don't fail the order creation if coupon increment fails
+      }
+    }
 
     // Update product stock
     for (const item of order.items) {
@@ -3048,6 +3134,20 @@ exports.createManualOrder = async (req, res) => {
         message: 'Invalid order type or missing user information',
       });
     }
+
+    // Build calculation log for audit trailing
+    const calculationLog = [];
+    calculationLog.push({ step: 'subtotal', amount: orderData.items.reduce((sum, item) => sum + (item.subtotal || 0), 0) || orderData.total, description: 'Initial items subtotal' });
+    
+    if (orderData.shippingCost > 0) {
+      calculationLog.push({ step: 'shipping', amount: orderData.shippingCost, description: 'Shipping cost added' });
+    }
+    if (orderData.discount > 0) {
+      calculationLog.push({ step: 'discount', amount: -orderData.discount, description: 'Manual discount applied' });
+    }
+    calculationLog.push({ step: 'total', amount: orderData.total, description: `Final calculated total. Source: manual (admin panel), Type: manual` });
+    
+    orderData.calculationLog = calculationLog;
 
     // Create the order
     const order = new Order(orderData);
@@ -3532,7 +3632,10 @@ exports.addOrderToSteadfast = async (req, res) => {
     let recipientAddress = '';
 
     // Get customer info from different sources
-    if (order.user && order.user.name) {
+    // Prioritize shippingAddress info over account info
+    if (order.shippingAddress?.name) {
+      recipientName = order.shippingAddress.name;
+    } else if (order.user && order.user.name) {
       recipientName = order.user.name;
     } else if (order.guestInfo?.name) {
       recipientName = order.guestInfo.name;
@@ -3540,7 +3643,9 @@ exports.addOrderToSteadfast = async (req, res) => {
       recipientName = order.manualOrderInfo.name;
     }
 
-    if (order.user && order.user.phone) {
+    if (order.shippingAddress?.phone) {
+      recipientPhone = order.shippingAddress.phone;
+    } else if (order.user && order.user.phone) {
       recipientPhone = order.user.phone;
     } else if (order.guestInfo?.phone) {
       recipientPhone = order.guestInfo.phone;
@@ -3816,7 +3921,7 @@ exports.updateOrderByUser = async (req, res) => {
     // Remove coupons and loyalty points since total has changed
     if (order.coupon) {
       try {
-        await Coupon.findOneAndUpdate({ code: order.coupon }, { $inc: { usedCount: -1 } });
+        await mongoose.model('Coupon').findOneAndUpdate({ code: order.coupon.toUpperCase() }, { $inc: { usedCount: -1 } });
       } catch (err) { }
     }
 

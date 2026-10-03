@@ -83,6 +83,7 @@ const orderSchema = new mongoose.Schema({
     },
     total: { type: Number, required: true },
     discount: { type: Number, default: 0 },
+
     upsellDiscount: { type: Number, default: 0 },
     loyaltyDiscount: { type: Number, default: 0 },
     loyaltyPointsUsed: { type: Number, default: 0 },
@@ -158,7 +159,13 @@ const orderSchema = new mongoose.Schema({
     steadfastConsignmentId: { type: String },
     steadfastTrackingCode: { type: String },
     steadfastCollectedAmount: { type: Number, default: 0 },
-    isReadByAdmin: { type: Boolean, default: false }
+    isReadByAdmin: { type: Boolean, default: false },
+    // Detailed calculation log to track exactly how the final price was determined
+    calculationLog: [{
+        step: { type: String, required: true }, // e.g., 'subtotal', 'coupon_applied', 'loyalty_applied', 'shipping_added', 'final_total'
+        amount: { type: Number },
+        description: { type: String }
+    }]
 }, {
     timestamps: true,
 });

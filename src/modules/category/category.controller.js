@@ -848,3 +848,39 @@ exports.getCategoryBySlug = async (req, res) => {
   }
 };
 
+exports.bulkUpdateCategoryDiscounts = async (req, res) => {
+  try {
+    const { action, value } = req.body;
+    let updateQuery = {};
+    
+    if (action === 'toggle_status') {
+      updateQuery = { 'categoryDiscount.isActive': Boolean(value) };
+    } else if (action === 'set_percentage') {
+      updateQuery = { 'categoryDiscount.percentage': Number(value) };
+    } else {
+      return sendResponse({
+        res,
+        statusCode: 400,
+        success: false,
+        message: 'Invalid action',
+      });
+    }
+
+    await Category.updateMany({}, { $set: updateQuery });
+
+    return sendResponse({
+      res,
+      statusCode: 200,
+      success: true,
+      message: 'Bulk updated successfully',
+    });
+  } catch (error) {
+    return sendResponse({
+      res,
+      statusCode: 500,
+      success: false,
+      message: error.message || 'Server error',
+    });
+  }
+};
+

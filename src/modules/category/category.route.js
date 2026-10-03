@@ -13,6 +13,7 @@ router.get('/header', categoryController.getHeaderCategories);
 router.get('/slug/:slug', categoryController.getCategoryBySlug);
 router.get('/:id', categoryController.getCategoryById);
 router.put('/reorder', categoryController.reorderCategories);
+router.put('/bulk/discount', categoryController.bulkUpdateCategoryDiscounts);
 router.put('/:id', categoryController.updateCategory);
 router.delete('/:id', categoryController.deleteCategory);
 
