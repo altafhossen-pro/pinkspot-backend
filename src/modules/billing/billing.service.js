@@ -28,11 +28,12 @@ const getProductsForBilling = async (queryOptions = {}) => {
   
   const [products, total] = await Promise.all([
     Product.find(query)
+      .select('title slug status isActive totalStock priceRange basePrice variants category createdAt featuredImage')
       .populate('category', 'name slug')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(parseInt(limit))
-      .select('title slug status isActive totalStock priceRange basePrice variants category createdAt featuredImage'),
+      .lean(),
     Product.countDocuments(query)
   ]);
   
@@ -56,7 +57,8 @@ const getProductsForBilling = async (queryOptions = {}) => {
 const getProductDetailsForBilling = async (id) => {
   const product = await Product.findById(id)
     .populate('category', 'name slug')
-    .populate('subCategories', 'name slug');
+    .populate('subCategories', 'name slug')
+    .lean();
     
   if (!product) {
     throw new Error('Product not found');
