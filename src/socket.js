@@ -16,6 +16,14 @@ module.exports = {
           'https://www.pinkspot.bd',
           'http://api.pinkspot.bd',
           'https://api.pinkspot.bd',
+          'http://pinkspot.vip',
+          'https://pinkspot.vip',
+          'http://www.pinkspot.vip',
+          'https://www.pinkspot.vip',
+          'http://office.pinkspot.vip',
+          'https://office.pinkspot.vip',
+          'http://api.pinkspot.vip',
+          'https://api.pinkspot.vip',
           'http://64.227.133.212:3000'
         ],
         methods: ["GET", "POST"]
